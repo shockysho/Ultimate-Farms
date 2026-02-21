@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ultimate Farms Mobile Wireframe</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --surface: #121a2b;
+      --surface-2: #1a2438;
+      --text: #ecf0f8;
+      --muted: #9aa6c2;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --orange: #f97316;
+      --red: #ef4444;
+      --line: #2a3752;
+    }
+
+    * { box-sizing: border-box; font-family: Inter, Roboto, Arial, sans-serif; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #090f1b 0%, #0b1220 100%);
+      color: var(--text);
+      padding: 24px;
+    }
+
+    .page-title {
+      margin: 0 0 4px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 0 0 20px;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 18px;
+    }
+
+    .phone {
+      background: #070d18;
+      border: 1px solid #1f2a42;
+      border-radius: 20px;
+      padding: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .screen {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--bg);
+      min-height: 590px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status {
+      background: #0f182c;
+      font-size: 11px;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .header {
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .header h3 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .content {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .card h4 {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .value {
+      margin-top: 6px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      padding: 2px 8px;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    .green { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.45); }
+    .yellow { background: rgba(234,179,8,.15); color: var(--yellow); border: 1px solid rgba(234,179,8,.45); }
+    .orange { background: rgba(249,115,22,.15); color: var(--orange); border: 1px solid rgba(249,115,22,.45); }
+    .red { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.45); }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 9px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      font-size: 12px;
+    }
+
+    .timeline-item {
+      border-left: 3px solid #344766;
+      padding-left: 8px;
+    }
+
+    .timeline-item .time {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .cta {
+      background: #253551;
+      border: 1px solid #3d547b;
+      color: #dce8ff;
+      text-align: center;
+      padding: 9px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .bottom-nav {
+      border-top: 1px solid var(--line);
+      background: #0e1627;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .bottom-nav div {
+      padding: 10px 4px;
+    }
+
+    .active {
+      color: #dbeafe;
+      font-weight: 700;
+    }
+
+    .legend {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">Ultimate Farms Mobile UI Wireframe</h1>
+  <p class="subtitle">Low-fidelity structural wireframe for Owner, Glue Person, Site Commander, and Sales Officer workflows.</p>
+
+  <section class="grid">
+    <article class="phone">
+      <div class="screen">
+        <div class="status"><span>09:41</span><span>Offline queue: 2</span></div>
+        <header class="header">
+          <h3>Owner Dashboard</h3>
+          <p>Farm health at a glance (12,500 birds)</p>
+        </header>
+        <main class="content">
+          <div class="kpi-grid">
+            <div class="card"><h4>HDP</h4><div class="value">82.4%</div><span class="badge yellow">YELLOW</span></div>
+            <div class="card"><h4>Feed Days</h4><div class="value">4.2</div><span class="badge red">RED</span></div>
+            <div class="card"><h4>Mortality</h4><div class="value">6/day</div><span class="badge red">RED</span></div>
+            <div class="card"><h4>Cash Variance</h4><div class="value">3.1%</div><span class="badge yellow">YELLOW</span></div>
+          </div>
+          <div class="row"><span>🔔 Feed stock below 5 days</span><span class="badge red">P1</span></div>
+          <div class="row"><span>⚠ 3 overdue tasks on Shift A</span><span class="badge yellow">P3</span></div>
+          <div class="cta">Open Red Alerts</div>
+          <div class="cta">Approve PO-2026-014 (₵7,800)</div>
+        </main>
+        <footer class="bottom-nav"><div class="active">Dashboard</div><div>Work</div><div>Alerts</div><div>Reports</div></footer>
+      </div>
+    </article>
+
+    <article class="phone">
+      <div class="screen">
+        <div class="status"><span>09:41</span><span>Synced 2m ago</span></div>
+        <header class="header">
+          <h3>Site Commander Timeline</h3>
+          <p>Designed Day enforcement</p>
+        </header>
+        <main class="content">
+          <div class="card timeline-item"><div class="time">05:30</div><strong>SC Arrival & Morning Check</strong><br><span class="badge green">VERIFIED</span></div>
+          <div class="card timeline-item"><div class="time">06:00</div><strong>Feed Issuance</strong><br><span class="badge yellow">AWAITING VERIFY</span></div>
+          <div class="card timeline-item"><div class="time">07:00</div><strong>Egg Collection Pass 1</strong><br><span class="badge orange">OVERDUE</span></div>
+          <div class="card timeline-item"><div class="time">07:45</div><strong>Health Walk</strong><br><span class="badge red">SKIPPED</span></div>
+          <div class="cta">Start Next Task</div>
+          <div class="cta">Request Verifier</div>
+        </main>
+        <footer class="bottom-nav"><div class="active">Timeline</div><div>Verify</div><div>Reconcile</div><div>Sync</div></footer>
+      </div>
+    </article>
+
+    <article class="phone">
+      <div class="screen">
+        <div class="status"><span>09:41</span><span>Pending sync: 1</span></div>
+        <header class="header">
+          <h3>Two-Person Verification</h3>
+          <p>Egg collection transaction</p>
+        </header>
+        <main class="content">
+          <div class="card">
+            <h4>Transaction</h4>
+            <div class="value" style="font-size:15px">TXN-EGG-2026-0442</div>
+            <p style="margin:6px 0 0;color:var(--muted);font-size:12px">L1 by SC Mensah: 352 crates equiv.</p>
+          </div>
+          <div class="row"><span>Verifier account</span><strong>Worker Ama #004</strong></div>
+          <div class="row"><span>Device check</span><span class="badge green">DIFFERENT DEVICE</span></div>
+          <div class="row"><span>Compare counts</span><strong>350 vs 352</strong></div>
+          <div class="row"><span>System check (L3)</span><span class="badge yellow">DISCREPANCY +2</span></div>
+          <div class="cta">Verify & Submit</div>
+          <div class="cta">Flag Investigation</div>
+        </main>
+        <footer class="bottom-nav"><div>Timeline</div><div class="active">Verify</div><div>Alerts</div><div>Profile</div></footer>
+      </div>
+    </article>
+
+    <article class="phone">
+      <div class="screen">
+        <div class="status"><span>09:41</span><span>Network weak</span></div>
+        <header class="header">
+          <h3>Sales Officer - Create DA</h3>
+          <p>Tier pricing locked by system</p>
+        </header>
+        <main class="content">
+          <div class="row"><span>DA ID</span><strong>DA-2026-0001</strong></div>
+          <div class="row"><span>Customer</span><strong>Goldline Traders</strong></div>
+          <div class="row"><span>Tier</span><span class="badge green">GOLD</span></div>
+          <div class="row"><span>Unit Price</span><strong>₵54 / crate (locked)</strong></div>
+          <div class="row"><span>Quantity</span><strong>120 crates</strong></div>
+          <div class="row"><span>Total</span><strong>₵6,480</strong></div>
+          <div class="cta">Assign Counter 1 & 2</div>
+          <div class="cta">Save DA (Offline-capable)</div>
+        </main>
+        <footer class="bottom-nav"><div class="active">Sales</div><div>Customers</div><div>Pipeline</div><div>Payments</div></footer>
+      </div>
+    </article>
+  </section>
+
+  <div class="legend">
+    <span class="badge green">GREEN</span>
+    <span class="badge yellow">YELLOW</span>
+    <span class="badge orange">ORANGE</span>
+    <span class="badge red">RED</span>
+  </div>
+</body>
+</html>

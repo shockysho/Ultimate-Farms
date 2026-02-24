@@ -173,8 +173,11 @@ def _build_section_recon_eggs(ws, start_row):
     prod_tbl = T("daily_cage_log")
     sales_tbl = T("sales")
 
+    table_start = start_row + 2
+    first_data_row = table_start + 1  # row after header
+
     calculated = {
-        1: 'IF(ROW()-ROW(INDIRECT("A3"))=0,0,INDIRECT("G"&(ROW()-1)))',  # Opening = prior day closing
+        1: f'IF(ROW()={first_data_row},0,INDIRECT("G"&(ROW()-1)))',  # Opening = prior day closing; first row = 0
         2: f'SUMIFS({prod_tbl}[Total Eggs],{prod_tbl}[Date],[@Date])',
         3: f'SUMIFS({sales_tbl}[Total Eggs],{sales_tbl}[Date/Time],">="&[@Date],{sales_tbl}[Date/Time],"<"&([@Date]+1))',
         4: f'SUMIFS({prod_tbl}[Grade: Cracked/Broken],{prod_tbl}[Date],[@Date])',
@@ -183,7 +186,6 @@ def _build_section_recon_eggs(ws, start_row):
         9: 'IF([@Variance (eggs)]="","",[@Variance (eggs)]/30)',
     }
 
-    table_start = start_row + 2
     tab, end_row = create_excel_table(
         ws, T("recon_eggs"), headers, rows, start_row=table_start,
         col_widths=[12, 16, 12, 10, 16, 14, 14, 12, 12, 14, 25, 10],

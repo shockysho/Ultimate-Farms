@@ -168,12 +168,14 @@ def _build_flock_table(ws, current_row, master_rows):
             None, None, "Monitor", "",
         ])
 
-    # Current Bird Count: initial minus total deaths in tblDailyCageLog
+    # Current Bird Count: initial minus deaths for cages belonging to this cohort
     dcl = T("daily_cage_log")  # "tblDailyCageLog"
+    housing = T("housing")     # "tblHousing"
     calculated = {
         5: (
             f'[@[Initial Count]]-SUMPRODUCT(({dcl}[Deaths])'
-            f'*({dcl}[Cage ID]<>""))'
+            f'*(IFERROR(INDEX({housing}[Cohort ID],MATCH({dcl}[Cage ID],{housing}[Cage ID],0)),"")'
+            f'=[@[Cohort ID]]))'
         ),
         6: 'INT((TODAY()-[@[Arrival Date]])/7)',
         7: (

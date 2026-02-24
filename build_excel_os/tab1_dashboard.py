@@ -102,22 +102,54 @@ def _build_owner_section(ws, start_row):
         cell.alignment = C.HEADER_ALIGN
     r += 1
 
+    # Lay % = Total Eggs today / bird count, averaged over 7 days
+    # We use SUMIFS for each cohort's cages via housing cross-ref
+    housing = T("housing")
+    lay_formula_a = (
+        f'=IFERROR(SUMPRODUCT(({prod}[Total Eggs])*({prod}[Date]>=TODAY()-6)'
+        f'*(IFERROR(INDEX({housing}[Cohort ID],MATCH({prod}[Cage ID],{housing}[Cage ID],0)),"")="FL2024A"))'
+        f'/(SUMPRODUCT(({prod}[Date]>=TODAY()-6)'
+        f'*(IFERROR(INDEX({housing}[Cohort ID],MATCH({prod}[Cage ID],{housing}[Cage ID],0)),"")="FL2024A")'
+        f'*(IFERROR(INDEX({flock}[Current Bird Count],MATCH("FL2024A",{flock}[Cohort ID],0)),1)))'
+        f'/30),0)'
+    )
+    lay_formula_b = (
+        f'=IFERROR(SUMPRODUCT(({prod}[Total Eggs])*({prod}[Date]>=TODAY()-6)'
+        f'*(IFERROR(INDEX({housing}[Cohort ID],MATCH({prod}[Cage ID],{housing}[Cage ID],0)),"")="FL2024B"))'
+        f'/(SUMPRODUCT(({prod}[Date]>=TODAY()-6)'
+        f'*(IFERROR(INDEX({housing}[Cohort ID],MATCH({prod}[Cage ID],{housing}[Cage ID],0)),"")="FL2024B")'
+        f'*(IFERROR(INDEX({flock}[Current Bird Count],MATCH("FL2024B",{flock}[Cohort ID],0)),1)))'
+        f'/30),0)'
+    )
+
+    # Thresholds for status formulas (hardcoded numerics, NOT text references)
+    mort_y = C.THRESHOLDS["mortality_daily_yellow"]
+    mort_r = C.THRESHOLDS["mortality_daily_red"]
+    disease_r = C.THRESHOLDS["disease_mortality_immediate_red"]
+    cracked_y = C.THRESHOLDS["cracked_pct_yellow"]
+    large_y = C.THRESHOLDS["large_pct_yellow_peak"]
+    fcr_y = C.THRESHOLDS["fcr_peak_yellow"]
+    fcr_r = C.THRESHOLDS["fcr_peak_red"]
+
+    # Each tuple: (label, value_formula, target_text, phase, trend, status_formula_template)
+    # status_formula_template uses {r} for the row number
     bio_kpis = [
         (
             "Lay % (FL2024A)",
-            f'=IFERROR(AVERAGEIFS({prod}[Large %],{prod}[Date],">="&(TODAY()-6)),0)',
+            lay_formula_a,
             f'=IFERROR(INDEX({target}[Effective Target: Lay %],MATCH("FL2024A",{target}[Cohort ID],0)),"N/A")',
             f'=IFERROR(INDEX({target}[Production Phase],MATCH("FL2024A",{target}[Cohort ID],0)),"N/A")',
             "->",
-            None,
+            # Compare lay % to target from target resolver (numeric cell)
+            '=IF(ISNUMBER(B{r}),IF(NOT(ISNUMBER(C{r})),"N/A",IF(B{r}>=C{r},"Green",IF(B{r}>=C{r}*0.95,"Yellow","Red"))),"N/A")',
         ),
         (
             "Lay % (FL2024B)",
-            f'=IFERROR(AVERAGEIFS({prod}[Large %],{prod}[Date],">="&(TODAY()-6)),0)',
+            lay_formula_b,
             f'=IFERROR(INDEX({target}[Effective Target: Lay %],MATCH("FL2024B",{target}[Cohort ID],0)),"N/A")',
             f'=IFERROR(INDEX({target}[Production Phase],MATCH("FL2024B",{target}[Cohort ID],0)),"N/A")',
             "->",
-            None,
+            '=IF(ISNUMBER(B{r}),IF(NOT(ISNUMBER(C{r})),"N/A",IF(B{r}>=C{r},"Green",IF(B{r}>=C{r}*0.95,"Yellow","Red"))),"N/A")',
         ),
         (
             "FCR (Overall)",
@@ -125,23 +157,25 @@ def _build_owner_section(ws, start_row):
             f'=IFERROR(INDEX({target}[Effective Target: FCR],1),"2.0")',
             "",
             "->",
-            None,
+            # Lower is better for FCR
+            f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}<={fcr_y},"Green",IF(B{{r}}<={fcr_r},"Yellow","Red")),"N/A")',
         ),
         (
             "Total Mortality (today)",
             f'=IFERROR(SUMIFS({prod}[Deaths],{prod}[Date],TODAY()),0)',
-            f'="<{C.THRESHOLDS["mortality_daily_yellow"]}"',
+            f"<{mort_y}",
             "",
             "",
-            None,
+            # Lower is better for mortality
+            f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}<{mort_y},"Green",IF(B{{r}}<{mort_r},"Yellow","Red")),"N/A")',
         ),
         (
             "Disease Mortality (today)",
             f'=IFERROR(SUMIFS({prod}[Deaths],{prod}[Date],TODAY(),{prod}[Death Cause],"Disease"),0)',
-            f'="<{C.THRESHOLDS["disease_mortality_immediate_red"]}"',
+            f"<{disease_r}",
             "",
             "",
-            None,
+            f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}<{disease_r},"Green","Red"),"N/A")',
         ),
         (
             "Cracked %",
@@ -149,10 +183,10 @@ def _build_owner_section(ws, start_row):
                 f'=IFERROR(SUMIFS({prod}[Grade: Cracked/Broken],{prod}[Date],TODAY())'
                 f'/SUMIFS({prod}[Total Eggs],{prod}[Date],TODAY()),0)'
             ),
-            f'="<{C.THRESHOLDS["cracked_pct_yellow"]*100}%"',
+            f"<{cracked_y*100:.0f}%",
             "",
             "->",
-            None,
+            f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}<{cracked_y},"Green",IF(B{{r}}<{cracked_y*1.5},"Yellow","Red")),"N/A")',
         ),
         (
             "Large %",
@@ -160,27 +194,25 @@ def _build_owner_section(ws, start_row):
                 f'=IFERROR(SUMIFS({prod}[Grade: Large],{prod}[Date],TODAY())'
                 f'/SUMIFS({prod}[Total Eggs],{prod}[Date],TODAY()),0)'
             ),
-            '=">60%"',
+            f">{large_y*100:.0f}%",
             "",
             "->",
-            None,
+            # Higher is better for Large %
+            f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}>={large_y},"Green",IF(B{{r}}>={large_y*0.9},"Yellow","Red")),"N/A")',
         ),
     ]
 
     status_start = r
     for kpi in bio_kpis:
-        for ci, val in enumerate(kpi):
-            cell = ws.cell(row=r, column=ci + 1, value=val)
-            if ci == 1:
-                cell.font = KPI_VALUE_FONT
-        # Status formula in column F
-        ws.cell(
-            row=r, column=6,
-            value=(
-                '=IF(ISNUMBER(B{r}),IF(B{r}>=C{r},"Green",'
-                'IF(B{r}>=C{r}*0.95,"Yellow","Red")),"N/A")'
-            ).format(r=r),
-        )
+        label, value_formula, target_text, phase, trend, status_tmpl = kpi
+        ws.cell(row=r, column=1, value=label).font = KPI_LABEL_FONT
+        cell_val = ws.cell(row=r, column=2, value=value_formula)
+        cell_val.font = KPI_VALUE_FONT
+        ws.cell(row=r, column=3, value=target_text)
+        ws.cell(row=r, column=4, value=phase)
+        ws.cell(row=r, column=5, value=trend)
+        # Status formula with hardcoded numeric thresholds
+        ws.cell(row=r, column=6, value=status_tmpl.format(r=r))
         r += 1
 
     add_text_status_cf(ws, f"F{status_start}:F{r - 1}")
@@ -225,10 +257,8 @@ def _build_owner_section(ws, start_row):
         (
             "Team Attendance",
             f'=IFERROR(COUNTIFS({labor}[Date],TODAY(),{labor}[Present],"Yes"),0)',
-            f'>="{C.THRESHOLDS["attendance_min_crew"]}"',
-            '=IF(B{{r}}>={thresh},"Green","Red")'.format(
-                thresh=C.THRESHOLDS["attendance_min_crew"]
-            ),
+            f'>={C.THRESHOLDS["attendance_min_crew"]}',
+            f'=IF(B{{r}}>={C.THRESHOLDS["attendance_min_crew"]},"Green","Red")',
         ),
     ]
 

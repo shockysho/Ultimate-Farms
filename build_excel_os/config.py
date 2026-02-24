@@ -1,140 +1,102 @@
 """
-config.py — Central schema registry for Ultimate Farms Excel OS v2.0
+config.py -- Central schema registry for Ultimate Farms Excel OS v2.0 (8-tab edition).
 All table names, column schemas, named ranges, formatting constants, and farm parameters.
 """
 
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, Protection, numbers
 
 # ============================================================
-# TAB NAMES (worksheet titles, max 31 chars)
+# TAB NAMES (worksheet titles, max 31 chars) -- 8 tabs total
 # ============================================================
 TAB_NAMES = {
-    # Layer 1 — Inputs
-    1:  "1-Production",
-    2:  "2-Environmental",
-    3:  "3-Mortality",
-    4:  "4-FeedConsumption",
-    5:  "5-WaterConsumption",
-    6:  "6-IngredientMovement",
-    7:  "7-FeedMixing",
-    8:  "8-Sales",
-    9:  "9-Procurement",
-    10: "10-Equipment",
-    11: "11-BiosecurityChecklist",
-    12: "12-VisitorLog",
-    13: "13-HealthIncident",
-    14: "14-MedicationVaccine",
-    15: "15-LaborCompliance",
-    16: "16-InventoryCount",
-    # Layer 2 — Master Data
-    17: "17-Config",
-    18: "18-StaffRegistry",
-    19: "19-HousingMap",
-    20: "20-FlockRegistry",
-    21: "21-BreederCurves",
-    22: "22-OwnerOverrides",
-    23: "23-CustomerCRM",
-    24: "24-CustomerProfile",
-    25: "25-VendorMaster",
-    26: "26-ItemMaster",
-    27: "27-FeedFormulation",
-    # Layer 3 — Target Engine
-    28: "28-TargetResolver",
-    # Layer 4 — Reconciliation
-    29: "29-ReconEggs",
-    30: "30-ReconCash",
-    31: "31-ReconFeed",
-    32: "32-FraudFlags",
-    # Layer 5 — Financial
-    33: "33-ChartOfAccounts",
-    34: "34-MonthlyPL",
-    35: "35-UnitEconomics",
-    # Layer 6 — Analytics
-    36: "36-PerformanceAnalytics",
-    37: "37-PredictionEngine",
-    38: "38-CycleCountScheduler",
-    # Views
-    39: "39-OwnerDashboard",
-    40: "40-ManagerDashboard",
+    1: "Dashboard",
+    2: "Daily Log",
+    3: "Feed & Inventory",
+    4: "Sales & Procurement",
+    5: "Events",
+    6: "Master Data",
+    7: "Engine",
+    8: "Analytics",
 }
 
 # ============================================================
 # TABLE NAMES (no spaces, unique across workbook)
+# String-keyed for readability; use T("key") helper below.
 # ============================================================
 TABLE_NAMES = {
-    1:  "tblProduction",
-    2:  "tblEnvironmental",
-    3:  "tblMortality",
-    4:  "tblFeedConsumption",
-    5:  "tblWaterConsumption",
-    6:  "tblIngredientMovement",
-    7:  "tblFeedMixBatchHeader",
-    "7b": "tblFeedMixBatchLines",
-    8:  "tblSales",
-    9:  "tblProcurement",
-    10: "tblEquipment",
-    11: "tblBiosecurity",
-    12: "tblVisitorLog",
-    13: "tblHealthIncident",
-    14: "tblMedication",
-    15: "tblLabor",
-    16: "tblInventoryCount",
-    17: "tblConfig",
-    18: "tblStaff",
-    19: "tblHousing",
-    20: "tblFlock",
-    21: "tblBreederCurves",
-    22: "tblOwnerOverrides",
-    23: "tblCustomerCRM",
-    24: "tblCustomerProfile",
-    25: "tblVendor",
-    26: "tblItemMaster",
-    27: "tblFeedFormulation",
-    "27b": "tblFormulaIngredients",
-    28: "tblTargetResolver",
-    29: "tblReconEggs",
-    30: "tblReconCash",
-    31: "tblReconFeed",
-    "31b": "tblReconFinishedFeed",
-    32: "tblFraudFlags",
-    33: "tblChartOfAccounts",
-    34: "tblMonthlyPL",
-    35: "tblUnitEconomics",
-    36: "tblPerfAnalytics",
-    37: "tblPredictions",
-    38: "tblCycleCountSchedule",
-    39: "tblOwnerDash",
-    40: "tblManagerDash",
+    # Tab 2 -- Daily Log
+    "daily_cage_log":      "tblDailyCageLog",
+    "environmental":       "tblEnvironmental",
+    "water_consumption":   "tblWaterConsumption",
+    "biosecurity":         "tblBiosecurity",
+    "labor":               "tblLabor",
+    # Tab 3 -- Feed & Inventory
+    "feed_consumption":    "tblFeedConsumption",
+    "ingredient_movement": "tblIngredientMovement",
+    "feed_mix_header":     "tblFeedMixBatchHeader",
+    "feed_mix_lines":      "tblFeedMixBatchLines",
+    "inventory_count":     "tblInventoryCount",
+    # Tab 4 -- Sales & Procurement
+    "sales":               "tblSales",
+    "procurement":         "tblProcurement",
+    # Tab 5 -- Events
+    "equipment":           "tblEquipment",
+    "visitor_log":         "tblVisitorLog",
+    "health_incident":     "tblHealthIncident",
+    "medication":          "tblMedication",
+    # Tab 6 -- Master Data
+    "config":              "tblConfig",
+    "staff":               "tblStaff",
+    "housing":             "tblHousing",
+    "flock":               "tblFlock",
+    "breeder_curves":      "tblBreederCurves",
+    "owner_overrides":     "tblOwnerOverrides",
+    "customer_master":     "tblCustomerMaster",
+    "vendor":              "tblVendor",
+    "item_master":         "tblItemMaster",
+    "feed_formulation":    "tblFeedFormulation",
+    "formula_ingredients": "tblFormulaIngredients",
+    # Tab 7 -- Engine
+    "target_resolver":     "tblTargetResolver",
+    "recon_eggs":          "tblReconEggs",
+    "recon_cash":          "tblReconCash",
+    "recon_feed":          "tblReconFeed",
+    "recon_finished_feed": "tblReconFinishedFeed",
+    "fraud_flags":         "tblFraudFlags",
+    # Tab 8 -- Analytics
+    "chart_of_accounts":   "tblChartOfAccounts",
+    "monthly_pl":          "tblMonthlyPL",
+    "unit_economics":      "tblUnitEconomics",
+    "perf_analytics":      "tblPerfAnalytics",
+    "predictions":         "tblPredictions",
+    "cycle_count_sched":   "tblCycleCountSchedule",
+    # Tab 1 -- Dashboard (virtual tables for KPI sections)
+    "owner_dash":          "tblOwnerDash",
+    "manager_dash":        "tblManagerDash",
 }
+
+
+def T(key):
+    """Shortcut: T('sales') -> 'tblSales'."""
+    return TABLE_NAMES[key]
+
+
+# Sheet name constant for Master Data (used by dropdown validations)
+MASTER_SHEET = TAB_NAMES[6]
 
 # ============================================================
 # TAB COLORS (hex, no #)
 # ============================================================
 TAB_COLORS = {
-    "L1": "4472C4",    # Blue — Input tabs
-    "L2": "70AD47",    # Green — Master Data
-    "L3": "ED7D31",    # Orange — Target Engine
-    "L4": "FF0000",    # Red — Reconciliation
-    "L5": "7030A0",    # Purple — Financial
-    "L6": "00B0F0",    # Teal — Analytics
-    "View": "FFC000",  # Gold — Dashboards
+    1: "FFD700",   # Gold -- Dashboard
+    2: "4472C4",   # Blue -- Daily Log (input)
+    3: "4472C4",   # Blue -- Feed & Inventory (input)
+    4: "4472C4",   # Blue -- Sales & Procurement (input)
+    5: "4472C4",   # Blue -- Events (input)
+    6: "70AD47",   # Green -- Master Data
+    7: "ED7D31",   # Orange -- Engine
+    8: "7030A0",   # Purple -- Analytics
 }
-
-def get_tab_color(tab_num):
-    if 1 <= tab_num <= 16:
-        return TAB_COLORS["L1"]
-    elif 17 <= tab_num <= 27:
-        return TAB_COLORS["L2"]
-    elif tab_num == 28:
-        return TAB_COLORS["L3"]
-    elif 29 <= tab_num <= 32:
-        return TAB_COLORS["L4"]
-    elif 33 <= tab_num <= 35:
-        return TAB_COLORS["L5"]
-    elif 36 <= tab_num <= 38:
-        return TAB_COLORS["L6"]
-    else:
-        return TAB_COLORS["View"]
 
 # ============================================================
 # FORMATTING CONSTANTS
@@ -219,7 +181,7 @@ FLOCK_DATA = [
     ("FL2024B", "Lohmann Brown Classic", "2024-07-01", 1790, "Active"),
 ]
 
-# Customers
+# Customers (merged CRM + Profile into single master list)
 CUSTOMER_DATA = [
     ("C001", "Kumasi Central Market", "Wholesale", "Nana Agyei", "0244-200-0001", "Kumasi Central", "Yes", 5000, 40, 5, 2, "MoMo"),
     ("C002", "Adum Egg Traders", "Wholesale", "Yaa Asantewaa", "0244-200-0002", "Adum, Kumasi", "Yes", 3000, 30, 4, 3, "MoMo"),
@@ -441,6 +403,7 @@ THRESHOLDS = {
     "feed_discrepancy_bags_yellow": 0.5,
     "ingredient_shrinkage_yellow": 0.02,
     "ingredient_shrinkage_red": 0.05,
+    "consecutive_below_target": 14,
 }
 
 # Equipment list
@@ -465,21 +428,21 @@ EQUIPMENT_LIST = [
 
 # Chart of Accounts
 CHART_OF_ACCOUNTS = [
-    ("4000", "Egg Sales", "Revenue", "Revenue — Primary"),
-    ("4010", "Manure Sales", "Revenue", "Revenue — Secondary"),
-    ("4020", "Culled Bird Sales", "Revenue", "Revenue — Secondary"),
-    ("5000", "Feed Ingredients", "COGS", "COGS — Feed"),
-    ("5010", "Premix & Supplements", "COGS", "COGS — Feed"),
-    ("5020", "Medications", "COGS", "COGS — Health"),
-    ("5030", "Feed Mixing Costs", "COGS", "COGS — Feed"),
-    ("6000", "Labor — Wages", "Opex", "Opex — Labor"),
-    ("6010", "Staff Food", "Opex", "Opex — Labor"),
-    ("6020", "Fuel", "Opex", "Opex — Energy"),
-    ("6030", "Repairs & Maintenance", "Opex", "Opex — Maintenance"),
-    ("6040", "Utilities (Water, Electric)", "Opex", "Opex — Utilities"),
-    ("6050", "Supplies (PPE, Chemicals, Packaging)", "Opex", "Opex — Supplies"),
-    ("6060", "Transport", "Opex", "Opex — Logistics"),
-    ("6070", "Other Operating Expenses", "Opex", "Opex — Other"),
+    ("4000", "Egg Sales", "Revenue", "Revenue -- Primary"),
+    ("4010", "Manure Sales", "Revenue", "Revenue -- Secondary"),
+    ("4020", "Culled Bird Sales", "Revenue", "Revenue -- Secondary"),
+    ("5000", "Feed Ingredients", "COGS", "COGS -- Feed"),
+    ("5010", "Premix & Supplements", "COGS", "COGS -- Feed"),
+    ("5020", "Medications", "COGS", "COGS -- Health"),
+    ("5030", "Feed Mixing Costs", "COGS", "COGS -- Feed"),
+    ("6000", "Labor -- Wages", "Opex", "Opex -- Labor"),
+    ("6010", "Staff Food", "Opex", "Opex -- Labor"),
+    ("6020", "Fuel", "Opex", "Opex -- Energy"),
+    ("6030", "Repairs & Maintenance", "Opex", "Opex -- Maintenance"),
+    ("6040", "Utilities (Water, Electric)", "Opex", "Opex -- Utilities"),
+    ("6050", "Supplies (PPE, Chemicals, Packaging)", "Opex", "Opex -- Supplies"),
+    ("6060", "Transport", "Opex", "Opex -- Logistics"),
+    ("6070", "Other Operating Expenses", "Opex", "Opex -- Other"),
     ("7000", "Equipment Purchases", "Capex", "Capex"),
     ("7010", "Infrastructure", "Capex", "Capex"),
 ]

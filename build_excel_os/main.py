@@ -1,5 +1,5 @@
 """
-main.py — Orchestrator for Ultimate Farms Excel OS v2.0.
+main.py -- Orchestrator for Ultimate Farms Excel OS v2.0 (8-tab edition).
 
 Usage:
     python -m build_excel_os.main
@@ -7,20 +7,17 @@ Usage:
 
 import os
 import sys
-import shutil
 import zipfile
 from pathlib import Path
 from openpyxl import Workbook
 
 from . import config as C
 from .sample_data import generate_all_sample_data
-from .layer2_master_data import build_layer2
-from .layer1_inputs import build_layer1
-from .layer3_target_engine import build_layer3
-from .layer4_reconciliation import build_layer4
-from .layer5_financial import build_layer5
-from .layer6_analytics import build_layer6
-from .views_dashboards import build_dashboards
+from .tab6_master_data import build_tab6_master_data
+from .tab_inputs import build_inputs
+from .tab7_engine import build_tab7_engine
+from .tab8_analytics import build_tab8_analytics
+from .tab1_dashboard import build_tab1_dashboard
 
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent
@@ -28,7 +25,7 @@ OUTPUT_FILE = OUTPUT_DIR / "Ultimate_Farms_Excel_OS_v2.0.xlsx"
 
 
 def apply_tab_colors(wb):
-    """Apply layer-based tab colors to every worksheet."""
+    """Apply tab colors to every worksheet."""
     tab_title_to_number = {v: k for k, v in C.TAB_NAMES.items()}
     for ws in wb.worksheets:
         tab_num = tab_title_to_number.get(ws.title)
@@ -37,47 +34,26 @@ def apply_tab_colors(wb):
 
 
 def reorder_sheets(wb):
-    """Reorder sheets: Dashboards first, then Layer 1, Layer 2, Layer 3-6."""
-    desired_order = []
-
-    # Dashboards first (39, 40)
-    for t in [39, 40]:
-        desired_order.append(C.TAB_NAMES[t])
-
-    # Layer 1 inputs (1-16)
-    for t in range(1, 17):
-        desired_order.append(C.TAB_NAMES[t])
-
-    # Layer 2 master data (17-27)
-    for t in range(17, 28):
-        desired_order.append(C.TAB_NAMES[t])
-
-    # Layer 3-6 engines (28-38)
-    for t in range(28, 39):
-        desired_order.append(C.TAB_NAMES[t])
-
-    # Build ordered list of worksheet objects
+    """Reorder sheets: Dashboard first, then Daily Log through Analytics."""
+    desired_order = [C.TAB_NAMES[i] for i in range(1, 9)]
     name_to_ws = {ws.title: ws for ws in wb.worksheets}
     ordered = []
     for name in desired_order:
         if name in name_to_ws:
             ordered.append(name_to_ws.pop(name))
-    # Append any remaining sheets (e.g., default "Sheet") at the end
     for ws in name_to_ws.values():
         ordered.append(ws)
-
     wb._sheets = ordered
 
 
 def remove_default_sheet(wb):
-    """Remove the default 'Sheet' created by openpyxl if it still exists."""
+    """Remove the default 'Sheet' created by openpyxl."""
     if "Sheet" in wb.sheetnames:
         del wb["Sheet"]
 
 
 def strip_calc_chain(filepath):
-    """Remove calcChain.xml from the xlsx to avoid formula chain corruption.
-    Excel will recalculate the chain on first open."""
+    """Remove calcChain.xml from xlsx to avoid formula chain corruption."""
     tmp = str(filepath) + ".tmp"
     with zipfile.ZipFile(str(filepath), "r") as zin:
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
@@ -91,63 +67,51 @@ def strip_calc_chain(filepath):
 def build():
     """Main build pipeline."""
     print("=" * 60)
-    print("  Ultimate Farms Excel OS v2.0 -- Build Starting")
+    print("  Ultimate Farms Excel OS v2.0 (8-Tab) -- Build Starting")
     print("=" * 60)
 
     # 1. Create workbook
     wb = Workbook()
-    print("\n[1/8] Workbook created")
+    print("\n[1/7] Workbook created")
 
     # 2. Generate sample data
-    print("[2/8] Generating sample data...")
+    print("[2/7] Generating sample data...")
     data = generate_all_sample_data()
     print(f"       {sum(len(v) for v in data.values() if isinstance(v, list))} total data rows generated")
 
-    # 3. Build Layer 2 first (master data — dropdowns depend on it)
-    print("[3/8] Building Layer 2: Master Data (11 tabs)...")
-    build_layer2(wb)
+    # 3. Build Tab 6: Master Data (must be first -- dropdowns depend on it)
+    print("[3/7] Building Tab 6: Master Data (11 tables)...")
+    master_rows = build_tab6_master_data(wb)
 
-    # 4. Build Layer 1 (inputs with sample data)
-    print("[4/8] Building Layer 1: Input Tabs (16 tabs)...")
-    build_layer1(wb, data)
+    # 4. Build Tabs 2-5: Input tabs
+    print("[4/7] Building Tabs 2-5: Input Tabs (15 tables)...")
+    build_inputs(wb, data, master_rows)
 
-    # 5. Build Layer 3 (target engine)
-    print("[5/8] Building Layer 3: Target Engine...")
-    build_layer3(wb)
+    # 5. Build Tab 7: Engine
+    print("[5/7] Building Tab 7: Engine (5 tables)...")
+    build_tab7_engine(wb)
 
-    # 6. Build Layer 4 (reconciliation)
-    print("[6/8] Building Layer 4: Reconciliation & Fraud...")
-    build_layer4(wb)
+    # 6. Build Tab 8: Analytics
+    print("[6/7] Building Tab 8: Analytics (6 sections)...")
+    build_tab8_analytics(wb)
 
-    # 7. Build Layer 5 (financial)
-    print("[7/8] Building Layer 5: Financial Engine...")
-    build_layer5(wb)
+    # 7. Build Tab 1: Dashboard
+    print("[7/7] Building Tab 1: Dashboard...")
+    build_tab1_dashboard(wb)
 
-    # 8. Build Layer 6 (analytics)
-    print("[8/8] Building Layer 6: Analytics & Predictions...")
-    build_layer6(wb)
-
-    # 9. Build Dashboards
-    print("[+]   Building Dashboard Views...")
-    build_dashboards(wb)
-
-    # 10. Apply tab colors
+    # Post-processing
     print("\n--- Post-processing ---")
     print("  Applying tab colors...")
     apply_tab_colors(wb)
 
-    # 11. Reorder sheets
-    print("  Reordering sheets (Dashboards > L1 > L2 > L3-6)...")
+    print("  Reordering sheets (Dashboard > Daily Log > ... > Analytics)...")
     reorder_sheets(wb)
 
-    # 12. Remove default sheet
     remove_default_sheet(wb)
 
-    # 13. Save
     print(f"\n  Saving to: {OUTPUT_FILE}")
     wb.save(str(OUTPUT_FILE))
 
-    # 14. Strip calcChain.xml to prevent formula-chain corruption
     print("  Stripping calcChain.xml...")
     strip_calc_chain(OUTPUT_FILE)
 
@@ -158,7 +122,6 @@ def build():
     print(f"  Size: {os.path.getsize(OUTPUT_FILE) / 1024:.0f} KB")
     print("=" * 60)
 
-    # Tab listing
     print("\nTab listing:")
     for i, name in enumerate(wb.sheetnames, 1):
         print(f"  {i:2d}. {name}")

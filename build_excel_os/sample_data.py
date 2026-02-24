@@ -1,5 +1,5 @@
 """
-sample_data.py — Generate 28 days of realistic poultry farm data for Ultimate Farms.
+sample_data.py -- Generate 28 days of realistic poultry farm data for Ultimate Farms.
 Lohmann Brown Classic layers, ~5000 birds, Kumasi Ghana, GHS currency.
 """
 
@@ -90,9 +90,8 @@ def generate_all_sample_data():
     init_bird_counts()
 
     data = {
-        "production": [],
+        "daily_cage_log": [],       # Merged production + mortality
         "environmental": [],
-        "mortality": [],
         "feed_consumption": [],
         "water_consumption": [],
         "ingredient_movement": [],
@@ -132,11 +131,13 @@ def generate_all_sample_data():
         day_total_eggs = 0
         day_total_mortality = 0
 
-        # === PRODUCTION (Tab 1) ===
+        # === DAILY CAGE LOG (merged production + mortality) ===
         for cage_id, house, zone, row, side, _, flock_id, active in C.HOUSING_DATA:
             birds = get_bird_count(cage_id)
             if birds <= 0:
                 continue
+
+            # -- Production --
             target_lay = get_target_lay_pct(flock_id, current_date)
             actual_lay = target_lay * heat_factor * random.gauss(1.0, 0.025)
             actual_lay = max(0, min(1.0, actual_lay))
@@ -163,21 +164,43 @@ def generate_all_sample_data():
             if grade_sum != total_eggs:
                 small = max(0, small + (total_eggs - grade_sum))
 
+            # -- Mortality --
+            daily_mort_rate = 0.0001 * random.gauss(1.0, 0.5)
+            if random.random() < 0.05:
+                daily_mort_rate *= 3
+
+            deaths = max(0, int(birds * daily_mort_rate + random.random()))
+            death_cause = ""
+            disease_sub = ""
+            mortality_action = ""
+            if deaths > 0:
+                death_cause = random.choices(
+                    ["Culled", "Disease", "Injury", "Unknown"],
+                    weights=[15, 25, 20, 40]
+                )[0]
+                if death_cause == "Disease":
+                    disease_sub = random.choice(["Respiratory", "Digestive", "Other"])
+                mortality_action = random.choice(["Disposed", "Disposed", "Lab sample", "Vet called"])
+                _bird_counts[cage_id] = max(0, birds - deaths)
+                day_total_mortality += deaths
+
             notes = ""
             if cracked_pct > 0.06:
                 notes = "High cracked rate observed"
             if actual_lay < target_lay * 0.92:
                 notes = "Below expected production" if not notes else notes + "; below expected"
 
-            data["production"].append([
+            data["daily_cage_log"].append([
                 current_date, cage_id, side, crates, singles,
-                large, medium, small, cracked, notes
+                large, medium, small, cracked,
+                deaths, death_cause, disease_sub, mortality_action, notes
             ])
             day_total_eggs += total_eggs
 
         total_eggs_by_day[current_date] = day_total_eggs
+        daily_mortality[current_date] = day_total_mortality
 
-        # === ENVIRONMENTAL (Tab 2) ===
+        # === ENVIRONMENTAL ===
         for house_name in ["House 1", "House 2", "House 3", "House 4", "House 5"]:
             # AM reading
             base_temp_am = random.gauss(28, 2.5)
@@ -205,47 +228,7 @@ def generate_all_sample_data():
                 water_status, ""
             ])
 
-        # === MORTALITY (Tab 3) ===
-        for cage_id, house, zone, row, side, _, flock_id, _ in C.HOUSING_DATA:
-            birds = get_bird_count(cage_id)
-            if birds <= 0:
-                continue
-            # Base mortality rate: ~0.05-0.1% per week = ~0.01% per day
-            daily_mort_rate = 0.0001 * random.gauss(1.0, 0.5)
-            if random.random() < 0.05:  # 5% chance of slightly elevated mortality
-                daily_mort_rate *= 3
-
-            deaths = max(0, int(birds * daily_mort_rate + random.random()))
-            if deaths > 0:
-                # Distribute causes
-                cause = random.choices(
-                    ["Culled", "Disease", "Injury", "Unknown"],
-                    weights=[15, 25, 20, 40]
-                )[0]
-                disease_sub = ""
-                symptoms = ""
-                if cause == "Disease":
-                    disease_sub = random.choice(["Respiratory", "Digestive", "Other"])
-                    symptoms = random.choice([
-                        "Wheezing, nasal discharge",
-                        "Watery droppings, lethargy",
-                        "Reduced feed intake, ruffled feathers",
-                        "Swollen eyes, difficulty breathing",
-                    ])
-                cluster = "No"
-                action = random.choice(["Disposed", "Disposed", "Lab sample", "Vet called"])
-                photo = "Yes" if cause == "Disease" else "No"
-
-                data["mortality"].append([
-                    current_date, cage_id, side, deaths, cause, disease_sub,
-                    symptoms, cluster, action, "No", photo, ""
-                ])
-                _bird_counts[cage_id] = max(0, birds - deaths)
-                day_total_mortality += deaths
-
-        daily_mortality[current_date] = day_total_mortality
-
-        # === FEED CONSUMPTION (Tab 4) ===
+        # === FEED CONSUMPTION ===
         for flock_id in ["FL2024A", "FL2024B"]:
             flock_birds = get_flock_bird_count(flock_id)
             if flock_birds <= 0:
@@ -268,12 +251,11 @@ def generate_all_sample_data():
                     issued_by, verified_by, ""
                 ])
 
-        # === WATER CONSUMPTION (Tab 5) ===
+        # === WATER CONSUMPTION ===
         for house_name in ["House 1", "House 2", "House 3", "House 4", "House 5"]:
-            # ~230ml per bird per day in tropical climate
             house_birds = sum(get_bird_count(c[0]) for c in C.HOUSING_DATA if c[1] == house_name)
             expected_liters = house_birds * 0.23
-            am_reading = round(random.uniform(500, 1000), 0)  # Starting meter
+            am_reading = round(random.uniform(500, 1000), 0)
             daily = round(expected_liters * random.gauss(1.0, 0.08), 0)
             pm_reading = am_reading + daily
 
@@ -281,9 +263,9 @@ def generate_all_sample_data():
                 current_date, house_name, am_reading, pm_reading, "Flow meter", ""
             ])
 
-        # === SALES (Tab 8) — 2-5 sales per day ===
+        # === SALES -- 2-5 sales per day ===
         num_sales = random.randint(2, 5) if not is_weekend else random.randint(1, 3)
-        available_eggs = day_total_eggs  # Simplified: sell from today's production
+        available_eggs = day_total_eggs
         for _ in range(num_sales):
             if available_eggs <= 0:
                 break
@@ -291,14 +273,13 @@ def generate_all_sample_data():
             cust_id = customer[0]
             cust_type = customer[2]
 
-            # Order size based on customer type
             if cust_type == "Wholesale":
                 order_crates = random.randint(10, 40)
             elif cust_type == "Agent":
                 order_crates = random.randint(8, 25)
             elif cust_type == "Regular Retail":
                 order_crates = random.randint(3, 10)
-            else:  # Walk-in
+            else:
                 order_crates = random.randint(1, 3)
 
             order_eggs = order_crates * 30
@@ -340,7 +321,7 @@ def generate_all_sample_data():
                 "", ""
             ])
 
-        # === PROCUREMENT (Tab 9) — 0-3 per day ===
+        # === PROCUREMENT -- 0-3 per day ===
         num_proc = random.choices([0, 0, 1, 1, 2, 3], weights=[30, 20, 20, 15, 10, 5])[0]
         for _ in range(num_proc):
             vendor = random.choice(C.VENDOR_DATA)
@@ -377,9 +358,9 @@ def generate_all_sample_data():
                 ""
             ])
 
-        # === INGREDIENT MOVEMENT (Tab 6) — receipts + issues ===
-        if random.random() < 0.3:  # 30% chance of a receipt
-            item = random.choice(C.ITEM_DATA[:10])  # First 10 are ingredients
+        # === INGREDIENT MOVEMENT -- receipts + issues ===
+        if random.random() < 0.3:
+            item = random.choice(C.ITEM_DATA[:10])
             qty = random.randint(100, 1000)
             price = C.PRICES.get(item[0], 5.0) * random.gauss(1.0, 0.05)
             vendor_id = item[8] or "V001"
@@ -392,7 +373,7 @@ def generate_all_sample_data():
                 random.choice(["STF001", "STF002"]), ""
             ])
 
-        # === FEED MIXING (Tab 7) — 1-2 batches every 2-3 days ===
+        # === FEED MIXING -- 1-2 batches every 2-3 days ===
         if day_offset % 3 == 0:
             batch_counter += 1
             formula_id = "FRM001"
@@ -407,8 +388,8 @@ def generate_all_sample_data():
             ]
             data["feed_mixing"].append(batch_header)
 
-        # === EQUIPMENT (Tab 10) — mostly green, occasional issues ===
-        if random.random() < 0.15:  # 15% chance of an equipment event
+        # === EQUIPMENT -- mostly green, occasional issues ===
+        if random.random() < 0.15:
             equip = random.choice(C.EQUIPMENT_LIST)
             status = random.choices(["Green", "Yellow", "Red"], weights=[60, 30, 10])[0]
             downtime = 0 if status == "Green" else random.uniform(0.5, 4) if status == "Yellow" else random.uniform(2, 12)
@@ -427,14 +408,14 @@ def generate_all_sample_data():
                 "Yes" if status == "Red" else "No", ""
             ])
 
-        # === BIOSECURITY CHECKLIST (Tab 11) — daily ===
+        # === BIOSECURITY CHECKLIST -- daily ===
         checks = []
         for _ in range(9):
             checks.append(random.choices(["Yes", "Yes", "Yes", "No"], weights=[90, 5, 3, 2])[0])
         supervisor = "STF001" if team_on_duty == "Team A" else "STF006"
         data["biosecurity"].append([current_date] + checks + [supervisor, ""])
 
-        # === VISITOR LOG (Tab 12) — 0-2 per day ===
+        # === VISITOR LOG -- 0-2 per day ===
         num_visitors = random.choices([0, 0, 1, 1, 2], weights=[40, 20, 20, 10, 10])[0]
         for _ in range(num_visitors):
             visitor_name = random.choice(["Yedent Delivery", "Vet Dr. Appiah", "WIENCO Sales Rep",
@@ -458,8 +439,8 @@ def generate_all_sample_data():
                 reason, zone, disinfection, approved_by, "", ""
             ])
 
-        # === HEALTH INCIDENT (Tab 13) — rare events ===
-        if random.random() < 0.08:  # ~8% chance per day
+        # === HEALTH INCIDENT -- rare events ===
+        if random.random() < 0.08:
             cage_id = random.choice([c[0] for c in C.HOUSING_DATA])
             flock_id = get_flock_for_cage(cage_id)
             symptom = random.choice(["Respiratory", "Digestive", "Behavioral"])
@@ -480,8 +461,8 @@ def generate_all_sample_data():
                 "No", "", action, "No", "", "Open", ""
             ])
 
-        # === MEDICATION (Tab 14) — periodic ===
-        if day_offset in (0, 14):  # Bi-weekly vitamin supplement
+        # === MEDICATION -- periodic ===
+        if day_offset in (0, 14):
             for flock_id in ["FL2024A", "FL2024B"]:
                 flock_birds = get_flock_bird_count(flock_id)
                 data["medication"].append([
@@ -491,7 +472,7 @@ def generate_all_sample_data():
                     f"LOT-VIT-{random.randint(100, 999)}", 0,
                     current_date + timedelta(days=14), ""
                 ])
-        if day_offset == 7:  # Newcastle booster in week 2
+        if day_offset == 7:
             for flock_id in ["FL2024A", "FL2024B"]:
                 flock_birds = get_flock_bird_count(flock_id)
                 data["medication"].append([
@@ -502,18 +483,17 @@ def generate_all_sample_data():
                     None, ""
                 ])
 
-        # === LABOR (Tab 15) ===
+        # === LABOR ===
         for staff in C.STAFF_DATA:
             staff_id, name, role, team, _, _, status = staff
             if status != "Active":
                 continue
-            # Check if on duty
             if team in ("Team A", "Team B") and team != team_on_duty:
                 present = False
             elif is_weekend and team != "Non-rotating" and team != "Management":
-                present = random.random() < 0.3  # Some weekend work
+                present = random.random() < 0.3
             else:
-                present = random.random() < 0.95  # 95% attendance
+                present = random.random() < 0.95
 
             arrival = time(random.randint(5, 7), random.randint(0, 30)) if present else None
             tasks_assigned = random.randint(3, 6)
@@ -531,12 +511,12 @@ def generate_all_sample_data():
                 violation, strike, "", ""
             ])
 
-        # === INVENTORY COUNT (Tab 16) — weekly + random ===
-        if day_of_week == 4:  # Friday counts
+        # === INVENTORY COUNT -- weekly + random ===
+        if day_of_week == 4:
             items_to_count = random.sample(C.ITEM_DATA[:10], min(3, len(C.ITEM_DATA[:10])))
             for item in items_to_count:
                 expected = random.randint(100, 2000)
-                variance_pct = random.gauss(0, 0.03)  # ~3% variance std
+                variance_pct = random.gauss(0, 0.03)
                 physical = max(0, int(expected * (1 + variance_pct)))
                 explanation = "" if abs(physical - expected) / max(expected, 1) < 0.02 else "Minor counting variance"
                 counted_by = random.choice(["STF003", "STF007", "STF004"])

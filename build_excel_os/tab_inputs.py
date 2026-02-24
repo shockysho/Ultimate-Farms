@@ -42,7 +42,7 @@ def build_tab2_daily_log(wb, data, master_rows):
     Section D: tblBiosecurity
     Section E: tblLabor
     """
-    ws = wb.create_sheet(title=C.TAB_NAMES[2])
+    ws = wb.create_sheet(title=C.TAB_NAMES[3])
     row = 1
 
     # ── Section A: Daily Cage Log ──────────────────────────────────────
@@ -261,7 +261,7 @@ def build_tab2_daily_log(wb, data, master_rows):
                          red_op="lessThan", red_val="0.8")
 
     freeze_panes(ws, "A2")
-    print("  Tab 2 (Daily Log): 5 tables on single sheet")
+    print("  Tab 3 (Daily Log): 5 tables on single sheet")
     return ws
 
 
@@ -277,7 +277,7 @@ def build_tab3_feed_inventory(wb, data, master_rows):
     Section C: tblFeedMixBatchHeader
     Section D: tblInventoryCount
     """
-    ws = wb.create_sheet(title=C.TAB_NAMES[3])
+    ws = wb.create_sheet(title=C.TAB_NAMES[4])
     row = 1
 
     # ── Section A: Feed Consumption ───────────────────────────────────
@@ -431,7 +431,8 @@ def build_tab3_feed_inventory(wb, data, master_rows):
                          red_op="lessThan", red_val="-0.05")
 
     freeze_panes(ws, "A2")
-    print("  Tab 3 (Feed & Inventory): 4 tables on single sheet")
+    protect_sheet(ws)
+    print("  Tab 4 (Feed & Inventory): 4 tables on single sheet")
     return ws
 
 
@@ -445,7 +446,7 @@ def build_tab4_sales_procurement(wb, data, master_rows):
     Section A: tblSales
     Section B: tblProcurement
     """
-    ws = wb.create_sheet(title=C.TAB_NAMES[4])
+    ws = wb.create_sheet(title=C.TAB_NAMES[5])
     row = 1
 
     # ── Section A: Sales ──────────────────────────────────────────────
@@ -547,7 +548,8 @@ def build_tab4_sales_procurement(wb, data, master_rows):
     add_text_status_cf(ws, f"V{row+1}:V{end_b}")
 
     freeze_panes(ws, "A2")
-    print("  Tab 4 (Sales & Procurement): 2 tables on single sheet")
+    protect_sheet(ws)
+    print("  Tab 5 (Sales & Procurement): 2 tables on single sheet")
     return ws
 
 
@@ -563,7 +565,7 @@ def build_tab5_events(wb, data, master_rows):
     Section C: tblHealthIncident
     Section D: tblMedication
     """
-    ws = wb.create_sheet(title=C.TAB_NAMES[5])
+    ws = wb.create_sheet(title=C.TAB_NAMES[6])
     row = 1
 
     # ── Section A: Equipment ──────────────────────────────────────────
@@ -691,7 +693,8 @@ def build_tab5_events(wb, data, master_rows):
     add_inline_dropdown(ws, f"I{row+1}:I{end_d}", C.DROPDOWN_LISTS["yes_no"])
 
     freeze_panes(ws, "A2")
-    print("  Tab 5 (Events): 4 tables on single sheet")
+    protect_sheet(ws)
+    print("  Tab 6 (Events): 4 tables on single sheet")
     return ws
 
 

@@ -457,7 +457,7 @@ def _build_section_cycle_count(ws, start_row):
 
 def build_tab8_analytics(wb):
     """Build Tab 8: Analytics -- 6 sections on one sheet."""
-    ws = wb.create_sheet(title=C.TAB_NAMES[8])
+    ws = wb.create_sheet(title=C.TAB_NAMES[9])
 
     row = 1
 

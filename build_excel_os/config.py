@@ -6,17 +6,18 @@ All table names, column schemas, named ranges, formatting constants, and farm pa
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, Protection, numbers
 
 # ============================================================
-# TAB NAMES (worksheet titles, max 31 chars) -- 8 tabs total
+# TAB NAMES (worksheet titles, max 31 chars) -- 9 tabs total
 # ============================================================
 TAB_NAMES = {
     1: "Dashboard",
-    2: "Daily Log",
-    3: "Feed & Inventory",
-    4: "Sales & Procurement",
-    5: "Events",
-    6: "Master Data",
-    7: "Engine",
-    8: "Analytics",
+    2: "Daily Entry",
+    3: "Daily Log",
+    4: "Feed & Inventory",
+    5: "Sales & Procurement",
+    6: "Events",
+    7: "Master Data",
+    8: "Engine",
+    9: "Analytics",
 }
 
 # ============================================================
@@ -24,27 +25,28 @@ TAB_NAMES = {
 # String-keyed for readability; use T("key") helper below.
 # ============================================================
 TABLE_NAMES = {
-    # Tab 2 -- Daily Log
+    # Tab 2 -- Daily Entry (no formal tables, cell-based form)
+    # Tab 3 -- Daily Log
     "daily_cage_log":      "tblDailyCageLog",
     "environmental":       "tblEnvironmental",
     "water_consumption":   "tblWaterConsumption",
     "biosecurity":         "tblBiosecurity",
     "labor":               "tblLabor",
-    # Tab 3 -- Feed & Inventory
+    # Tab 4 -- Feed & Inventory
     "feed_consumption":    "tblFeedConsumption",
     "ingredient_movement": "tblIngredientMovement",
     "feed_mix_header":     "tblFeedMixBatchHeader",
     "feed_mix_lines":      "tblFeedMixBatchLines",
     "inventory_count":     "tblInventoryCount",
-    # Tab 4 -- Sales & Procurement
+    # Tab 5 -- Sales & Procurement
     "sales":               "tblSales",
     "procurement":         "tblProcurement",
-    # Tab 5 -- Events
+    # Tab 6 -- Events
     "equipment":           "tblEquipment",
     "visitor_log":         "tblVisitorLog",
     "health_incident":     "tblHealthIncident",
     "medication":          "tblMedication",
-    # Tab 6 -- Master Data
+    # Tab 7 -- Master Data
     "config":              "tblConfig",
     "staff":               "tblStaff",
     "housing":             "tblHousing",
@@ -56,14 +58,14 @@ TABLE_NAMES = {
     "item_master":         "tblItemMaster",
     "feed_formulation":    "tblFeedFormulation",
     "formula_ingredients": "tblFormulaIngredients",
-    # Tab 7 -- Engine
+    # Tab 8 -- Engine
     "target_resolver":     "tblTargetResolver",
     "recon_eggs":          "tblReconEggs",
     "recon_cash":          "tblReconCash",
     "recon_feed":          "tblReconFeed",
     "recon_finished_feed": "tblReconFinishedFeed",
     "fraud_flags":         "tblFraudFlags",
-    # Tab 8 -- Analytics
+    # Tab 9 -- Analytics
     "chart_of_accounts":   "tblChartOfAccounts",
     "monthly_pl":          "tblMonthlyPL",
     "unit_economics":      "tblUnitEconomics",
@@ -82,20 +84,21 @@ def T(key):
 
 
 # Sheet name constant for Master Data (used by dropdown validations)
-MASTER_SHEET = TAB_NAMES[6]
+MASTER_SHEET = TAB_NAMES[7]
 
 # ============================================================
 # TAB COLORS (hex, no #)
 # ============================================================
 TAB_COLORS = {
     1: "FFD700",   # Gold -- Dashboard
-    2: "4472C4",   # Blue -- Daily Log (input)
-    3: "4472C4",   # Blue -- Feed & Inventory (input)
-    4: "4472C4",   # Blue -- Sales & Procurement (input)
-    5: "4472C4",   # Blue -- Events (input)
-    6: "70AD47",   # Green -- Master Data
-    7: "ED7D31",   # Orange -- Engine
-    8: "7030A0",   # Purple -- Analytics
+    2: "FF6600",   # Orange -- Daily Entry (data-entry form)
+    3: "4472C4",   # Blue -- Daily Log (input)
+    4: "4472C4",   # Blue -- Feed & Inventory (input)
+    5: "4472C4",   # Blue -- Sales & Procurement (input)
+    6: "4472C4",   # Blue -- Events (input)
+    7: "70AD47",   # Green -- Master Data
+    8: "ED7D31",   # Orange -- Engine
+    9: "7030A0",   # Purple -- Analytics
 }
 
 # ============================================================

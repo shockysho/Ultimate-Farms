@@ -426,8 +426,8 @@ def _build_formula_ingredients_table(ws, current_row, master_rows):
 
 def build_tab6_master_data(wb):
     """Build Tab 6: Master Data -- 11 tables on one sheet. Returns master_rows dict."""
-    ws = wb.create_sheet(title=C.TAB_NAMES[6])
-    ws.sheet_properties.tabColor = C.TAB_COLORS[6]
+    ws = wb.create_sheet(title=C.TAB_NAMES[7])
+    ws.sheet_properties.tabColor = C.TAB_COLORS[7]
 
     master_rows = {}
     current_row = 1

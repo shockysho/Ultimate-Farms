@@ -404,7 +404,7 @@ def _build_section_fraud_flags(ws, start_row):
 
 def build_tab7_engine(wb):
     """Build Tab 7: Engine -- Target Resolver + Reconciliation + Fraud Flags."""
-    ws = wb.create_sheet(title=C.TAB_NAMES[7])
+    ws = wb.create_sheet(title=C.TAB_NAMES[8])
 
     row = 1
 

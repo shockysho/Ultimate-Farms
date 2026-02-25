@@ -3,7 +3,8 @@ helpers.py — Shared utility functions for building the Excel OS workbook.
 Table creation, data validation, conditional formatting, protection, named ranges.
 """
 
-from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn, TableFormula
+from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
+from openpyxl.worksheet.filters import AutoFilter
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.formatting.rule import CellIsRule, FormulaRule
@@ -89,27 +90,13 @@ def create_excel_table(ws, table_name, headers, data_rows, start_row=1, start_co
     tab.tableStyleInfo = style
 
     # Manually build TableColumn list (avoids _initialise_columns issues).
-    # For columns that contain formulas, set calculatedColumnFormula so Excel
-    # doesn't trigger a "repair" by auto-detecting calculated columns.
-    # Detect formula columns from: (a) calculated_columns dict, (b) data_rows values.
-    detected_formulas = {}
-    if calculated_columns:
-        for col_offset, formula in calculated_columns.items():
-            detected_formulas[col_offset] = formula  # already without leading '='
-    # Also scan the first data row for formulas passed via data_rows
-    if num_rows > 0 and data_rows:
-        first_row = data_rows[0]
-        for ci, value in enumerate(first_row):
-            if ci not in detected_formulas and isinstance(value, str) and value.startswith("="):
-                detected_formulas[ci] = value[1:]  # strip leading '='
+    # NOTE: Do NOT set calculatedColumnFormula -- it causes Excel to trigger
+    # "Removed Records: Table" repair errors.  Formulas are written to cells
+    # only, which Excel accepts without issue.
+    tab.tableColumns = [TableColumn(id=i + 1, name=h) for i, h in enumerate(headers)]
 
-    col_list = []
-    for i, h in enumerate(headers):
-        calc_formula = None
-        if i in detected_formulas:
-            calc_formula = TableFormula(attr_text=detected_formulas[i])
-        col_list.append(TableColumn(id=i + 1, name=h, calculatedColumnFormula=calc_formula))
-    tab.tableColumns = col_list
+    # Excel expects an autoFilter element on every table
+    tab.autoFilter = AutoFilter(ref=ref)
 
     ws.add_table(tab)
 

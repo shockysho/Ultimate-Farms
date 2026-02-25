@@ -131,7 +131,7 @@ def _build_housing_table(ws, current_row, master_rows):
         rows.append([h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], None, "Green"])
 
     # Total Birds = SUMIFS of Bird Count per House where Active="Yes"
-    calculated = {8: 'SUMIFS([Bird Count],[House],[@House],[Active],"Yes")'}
+    calculated = {8: 'SUMIFS(tblHousing[Bird Count],tblHousing[House],[@House],tblHousing[Active],"Yes")'}
 
     write_section_header(ws, current_row, 1, "HOUSING MAP", merge_end_col=max_cols)
     current_row += 1

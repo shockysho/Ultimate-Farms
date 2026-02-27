@@ -1,18 +1,24 @@
 """
-tab7_engine.py -- Tab 7: Engine sheet.
-Merges old layer3_target_engine.py + layer4_reconciliation.py onto ONE sheet.
-Sections: tblTargetResolver, tblReconEggs, tblReconCash, tblReconFeed, tblFraudFlags.
+tab7_engine.py -- Tab 7: Engine sheet (v3.0 Verification Core).
+8 sections: Target Resolver, Egg/Cash/Feed/Mortality/Inventory Recon,
+Ghost Money tracker, and 41 Fraud Flags.
 """
 
 from datetime import timedelta
 from . import config as C
 from .config import T
-from .sample_data import DATA_START_DATE, NUM_DAYS
 from .helpers import (
     create_excel_table, protect_sheet, freeze_panes,
     add_text_status_cf, add_traffic_light_cf, write_section_header,
     apply_header_formatting, add_inline_dropdown, set_col_widths,
 )
+
+
+def _lookback_dates():
+    """Return (start_date, num_rows) for lookback-limited recon tables."""
+    lookback = min(C.NUM_DAYS, C.RECON_LOOKBACK_DAYS)
+    start_date = C.DATA_END_DATE - timedelta(days=lookback - 1)
+    return start_date, lookback
 
 
 # ---------------------------------------------------------------------------
@@ -143,11 +149,11 @@ def _build_section_target_resolver(ws, start_row):
 
 
 # ---------------------------------------------------------------------------
-# Section B: tblReconEggs
+# Section B: tblReconEggs  (lookback-limited)
 # ---------------------------------------------------------------------------
 
 def _build_section_recon_eggs(ws, start_row):
-    """Build the Egg Reconciliation table. Returns next free row."""
+    """Build the Egg Reconciliation table (lookback-limited). Returns next free row."""
 
     write_section_header(ws, start_row, 1,
                          "DAILY EGG RECONCILIATION", merge_end_col=12)
@@ -159,9 +165,10 @@ def _build_section_recon_eggs(ws, start_row):
         "Explanation", "SC Sign-off",
     ]
 
+    lb_start, lb_rows = _lookback_dates()
     rows = []
-    for day_offset in range(NUM_DAYS):
-        current_date = DATA_START_DATE + timedelta(days=day_offset)
+    for day_offset in range(lb_rows):
+        current_date = lb_start + timedelta(days=day_offset)
         rows.append([
             current_date,
             None, None, None, None, 0, None,  # Formulas
@@ -206,11 +213,11 @@ def _build_section_recon_eggs(ws, start_row):
 
 
 # ---------------------------------------------------------------------------
-# Section C: tblReconCash
+# Section C: tblReconCash  (lookback-limited)
 # ---------------------------------------------------------------------------
 
 def _build_section_recon_cash(ws, start_row):
-    """Build the Cash Reconciliation table. Returns next free row."""
+    """Build the Cash Reconciliation table (lookback-limited). Returns next free row."""
 
     write_section_header(ws, start_row, 1,
                          "DAILY CASH RECONCILIATION", merge_end_col=11)
@@ -222,9 +229,10 @@ def _build_section_recon_cash(ws, start_row):
         "Cash Pending Deposit", "Status",
     ]
 
+    lb_start, lb_rows = _lookback_dates()
     rows = []
-    for day_offset in range(NUM_DAYS):
-        current_date = DATA_START_DATE + timedelta(days=day_offset)
+    for day_offset in range(lb_rows):
+        current_date = lb_start + timedelta(days=day_offset)
         rows.append([current_date] + [None] * 10)
 
     sales = T("sales")
@@ -260,11 +268,11 @@ def _build_section_recon_cash(ws, start_row):
 
 
 # ---------------------------------------------------------------------------
-# Section D: tblReconFeed
+# Section D: tblReconFeed  (lookback-limited)
 # ---------------------------------------------------------------------------
 
 def _build_section_recon_feed(ws, start_row):
-    """Build the Feed Reconciliation table. Returns next free row."""
+    """Build the Feed Reconciliation table (lookback-limited). Returns next free row."""
 
     write_section_header(ws, start_row, 1,
                          "FEED & INGREDIENT RECONCILIATION", merge_end_col=10)
@@ -274,9 +282,10 @@ def _build_section_recon_feed(ws, start_row):
         "Discrepancy (kg)", "Discrepancy (bags)", "Status",
     ]
 
+    lb_start, lb_rows = _lookback_dates()
     rows = []
-    for day_offset in range(NUM_DAYS):
-        current_date = DATA_START_DATE + timedelta(days=day_offset)
+    for day_offset in range(lb_rows):
+        current_date = lb_start + timedelta(days=day_offset)
         rows.append([current_date] + [None] * 5)
 
     feed = T("feed_consumption")
@@ -307,93 +316,295 @@ def _build_section_recon_feed(ws, start_row):
 
 
 # ---------------------------------------------------------------------------
-# Section E: tblFraudFlags
+# Section E: tblReconMortality  (NEW -- Bible Part 3 Engine 4)
+# ---------------------------------------------------------------------------
+
+def _build_section_recon_mortality(ws, start_row):
+    """Build Mortality / Flock Reconciliation table. Returns next free row."""
+
+    write_section_header(ws, start_row, 1,
+                         "MORTALITY & FLOCK RECONCILIATION", merge_end_col=12)
+
+    headers = [
+        "Date",
+        "Opening Flock",
+        "Deaths Today",
+        "Culls Today",
+        "Live Sales",
+        "Expected Closing",
+        "Mortality Rate (%/day)",
+        "Breeder Target (%/day)",
+        "Variance",
+        "Zero-Mortality Streak",
+        "Bio Improbability Flag",
+        "Status",
+    ]
+
+    lb_start, lb_rows = _lookback_dates()
+    rows = []
+    for day_offset in range(lb_rows):
+        current_date = lb_start + timedelta(days=day_offset)
+        rows.append([current_date] + [None] * 11)
+
+    cage_log = T("daily_cage_log")
+    flock = T("flock")
+    bc = T("breeder_curves")
+    zero_flag = C.THRESHOLDS["mortality_zero_days_flag"]
+
+    table_start = start_row + 2
+    first_data_row = table_start + 1
+
+    calculated = {
+        # Opening flock: first row = SUM of active bird counts; subsequent = prior Expected Closing
+        1: f'IF(ROW()={first_data_row},'
+           f'SUMPRODUCT(({flock}[Current Bird Count])*({flock}[Status]="Active")),'
+           f'INDIRECT("F"&(ROW()-1)))',
+        # Deaths today
+        2: f'SUMIFS({cage_log}[Deaths],{cage_log}[Date],[@Date])',
+        # Culls today (deaths where cause = Culled)
+        3: f'SUMIFS({cage_log}[Deaths],{cage_log}[Date],[@Date],{cage_log}[Death Cause],"Culled")',
+        # Live sales (placeholder -- 0 for now)
+        4: '0',
+        # Expected closing
+        5: '[@Opening Flock]-[@Deaths Today]-[@Culls Today]-[@Live Sales]',
+        # Mortality rate (%/day)
+        6: 'IF([@Opening Flock]=0,0,[@Deaths Today]/[@Opening Flock])',
+        # Breeder target (%/day) -- monthly rate / 30
+        7: f'IFERROR(INDEX({bc}[Mortality Band (% monthly)],'
+           f'MATCH(INT(([@Date]-MIN({flock}[Placement Date]))/7)+18,'
+           f'{bc}[Week],1)),0.003)/30',
+        # Variance (actual - target; positive = worse than expected)
+        8: '[@Mortality Rate (%/day)]-[@Breeder Target (%/day)]',
+        # Zero-mortality streak: running count of consecutive zero-death days
+        9: f'IF([@Deaths Today]>0,0,'
+           f'IF(ROW()={first_data_row},IF([@Deaths Today]=0,1,0),'
+           f'INDIRECT("J"&(ROW()-1))+1))',
+        # Bio improbability flag
+        10: f'IF(AND([@Zero-Mortality Streak]>={zero_flag},'
+            f'[@Opening Flock]>2000),"FLAG","")',
+        # Status
+        11: 'IF([@Bio Improbability Flag]="FLAG","Red",'
+            'IF([@Variance]>0.0002,"Yellow","Green"))',
+    }
+
+    tab, end_row = create_excel_table(
+        ws, T("recon_mortality"), headers, rows, start_row=table_start,
+        col_widths=[12, 14, 12, 10, 10, 14, 16, 16, 12, 18, 18, 10],
+        calculated_columns=calculated,
+        number_formats={
+            1: C.FMT_INTEGER, 2: C.FMT_INTEGER, 3: C.FMT_INTEGER,
+            4: C.FMT_INTEGER, 5: C.FMT_INTEGER,
+            6: C.FMT_PERCENT_2, 7: C.FMT_PERCENT_2, 8: C.FMT_PERCENT_2,
+            9: C.FMT_INTEGER,
+        },
+    )
+
+    add_text_status_cf(ws, f"L{table_start + 1}:L{end_row}")
+
+    return end_row + 2
+
+
+# ---------------------------------------------------------------------------
+# Section F: tblReconInventory  (NEW -- Bible Part 3 Engine 5)
+# ---------------------------------------------------------------------------
+
+def _build_section_recon_inventory(ws, start_row):
+    """Build Inventory Reconciliation table. Returns next free row."""
+
+    write_section_header(ws, start_row, 1,
+                         "INVENTORY RECONCILIATION (Cycle Count)", merge_end_col=12)
+
+    headers = [
+        "Count Date",
+        "Item ID",
+        "Item Name",
+        "Category",
+        "Expected Qty",
+        "Counted Qty",
+        "Variance",
+        "Variance %",
+        "Reason Code",
+        "Investigation Notes",
+        "Resolved By",
+        "Status",
+    ]
+
+    inv_count = T("inventory_count")
+
+    # Build 10 placeholder rows (populated by cycle counts, not daily)
+    rows = []
+    for _ in range(10):
+        rows.append([None] * 12)
+
+    var_yel = C.THRESHOLDS["inventory_variance_yellow_pct"]
+    var_red = C.THRESHOLDS["inventory_variance_red_pct"]
+
+    calculated = {
+        # Variance
+        6: 'IF(OR([@Counted Qty]="",[@Expected Qty]=""),"",[@Counted Qty]-[@Expected Qty])',
+        # Variance %
+        7: 'IF(OR([@Expected Qty]="",[@Expected Qty]=0),"",[@Variance]/[@Expected Qty])',
+        # Status
+        11: f'IF([@Variance %]="","",IF(ABS([@Variance %])>{var_red},"Red",IF(ABS([@Variance %])>{var_yel},"Yellow","Green")))',
+    }
+
+    table_start = start_row + 2
+    tab, end_row = create_excel_table(
+        ws, T("recon_inventory"), headers, rows, start_row=table_start,
+        col_widths=[12, 10, 22, 14, 12, 12, 10, 12, 16, 25, 12, 10],
+        calculated_columns=calculated,
+        number_formats={
+            4: C.FMT_DECIMAL_1, 5: C.FMT_DECIMAL_1,
+            6: C.FMT_DECIMAL_1, 7: C.FMT_PERCENT,
+        },
+    )
+
+    add_text_status_cf(ws, f"L{table_start + 1}:L{end_row}")
+    add_inline_dropdown(ws, f"I{table_start + 1}:I{end_row}",
+                        C.DROPDOWN_LISTS["inventory_reason_code"])
+
+    return end_row + 2
+
+
+# ---------------------------------------------------------------------------
+# Section G: tblGhostMoney  (NEW -- Bible Part 2 §2.6)
+# ---------------------------------------------------------------------------
+
+def _build_section_ghost_money(ws, start_row):
+    """Build Ghost Money tracker table. Returns next free row."""
+
+    write_section_header(ws, start_row, 1,
+                         "GHOST MONEY TRACKER -- Where Money Disappears (GHS)",
+                         merge_end_col=12)
+
+    headers = [
+        "Date",
+        "Feed Shrinkage (GHS)",
+        "Mortality Over-Target (GHS)",
+        "Egg Variance Loss (GHS)",
+        "Cracked/Damaged (GHS)",
+        "Price Arbitrage Missed (GHS)",
+        "Cash Discrepancy (GHS)",
+        "Inventory Carrying (GHS)",
+        "Daily Ghost Money (GHS)",
+        "Cumulative Ghost Money (GHS)",
+        "Status",
+        "Notes",
+    ]
+
+    lb_start, lb_rows = _lookback_dates()
+    rows = []
+    for day_offset in range(lb_rows):
+        current_date = lb_start + timedelta(days=day_offset)
+        rows.append([current_date] + [None] * 11)
+
+    recon_feed = T("recon_feed")
+    recon_mort = T("recon_mortality")
+    recon_eggs = T("recon_eggs")
+    recon_cash = T("recon_cash")
+    cage_log = T("daily_cage_log")
+
+    # Average feed cost per kg (weighted average of maize-dominated mix ~6.5 GHS/kg)
+    avg_feed_cost = 6.5
+    # Bird replacement cost
+    bird_cost = 55
+    # Avg crate price
+    avg_crate = C.PRICES["egg_crate_default"]
+    # Ghost money thresholds
+    gm_yel = C.THRESHOLDS["ghost_money_daily_yellow"]
+    gm_red = C.THRESHOLDS["ghost_money_daily_red"]
+
+    table_start = start_row + 2
+    first_data_row = table_start + 1
+
+    calculated = {
+        # Feed shrinkage loss: positive discrepancy × feed cost/kg
+        1: f'IFERROR(MAX(0,INDEX({recon_feed}[Discrepancy (kg)],MATCH([@Date],{recon_feed}[Date],0)))*{avg_feed_cost},0)',
+        # Mortality over-target: excess deaths × bird replacement cost
+        2: f'IFERROR(MAX(0,INDEX({recon_mort}[Variance],MATCH([@Date],{recon_mort}[Date],0)))*'
+           f'INDEX({recon_mort}[Opening Flock],MATCH([@Date],{recon_mort}[Date],0))*{bird_cost},0)',
+        # Egg variance loss: missing eggs (negative variance) × crate price / 30
+        3: f'IFERROR(MAX(0,-INDEX({recon_eggs}[Variance (crates)],MATCH([@Date],{recon_eggs}[Date],0)))*{avg_crate},0)',
+        # Cracked/damaged loss: cracked above 2.5% baseline × crate price
+        4: f'IFERROR(MAX(0,SUMIFS({cage_log}[Grade: Cracked/Broken],{cage_log}[Date],[@Date])-'
+           f'SUMIFS({cage_log}[Total Eggs],{cage_log}[Date],[@Date])*0.025)*{avg_crate}/30,0)',
+        # Price arbitrage missed (placeholder -- 0)
+        5: '0',
+        # Cash discrepancy
+        6: f'IFERROR(ABS(INDEX({recon_cash}[Daily Revenue Variance],MATCH([@Date],{recon_cash}[Date],0))),0)',
+        # Inventory carrying cost (placeholder -- 0)
+        7: '0',
+        # Daily ghost money: sum of components
+        8: 'SUM([@Feed Shrinkage (GHS)]:[@Inventory Carrying (GHS)])',
+        # Cumulative: running total
+        9: f'IF(ROW()={first_data_row},[@Daily Ghost Money (GHS)],'
+           f'INDIRECT("J"&(ROW()-1))+[@Daily Ghost Money (GHS)])',
+        # Status
+        10: f'IF([@Daily Ghost Money (GHS)]>{gm_red},"Red",'
+            f'IF([@Daily Ghost Money (GHS)]>{gm_yel},"Yellow","Green"))',
+    }
+
+    tab, end_row = create_excel_table(
+        ws, T("ghost_money"), headers, rows, start_row=table_start,
+        col_widths=[12, 18, 20, 18, 18, 20, 18, 18, 20, 22, 10, 25],
+        calculated_columns=calculated,
+        number_formats={
+            1: C.FMT_CURRENCY, 2: C.FMT_CURRENCY, 3: C.FMT_CURRENCY,
+            4: C.FMT_CURRENCY, 5: C.FMT_CURRENCY, 6: C.FMT_CURRENCY,
+            7: C.FMT_CURRENCY, 8: C.FMT_CURRENCY, 9: C.FMT_CURRENCY,
+        },
+    )
+
+    add_text_status_cf(ws, f"K{table_start + 1}:K{end_row}")
+
+    return end_row + 2
+
+
+# ---------------------------------------------------------------------------
+# Section H: tblFraudFlags  (expanded 17 → 41)
 # ---------------------------------------------------------------------------
 
 def _build_section_fraud_flags(ws, start_row):
-    """Build the Fraud Flags reference/output table. Returns next free row."""
+    """Build the Fraud Flags table (41 flags from Bible). Returns next free row."""
 
     write_section_header(ws, start_row, 1,
-                         "FRAUD FLAGS -- Auto-Generated from All Input Tabs",
-                         merge_end_col=10)
+                         f"FRAUD FLAGS ({len(C.FRAUD_FLAGS)} Rules) -- Auto-Generated from All Input Tabs",
+                         merge_end_col=11)
 
     headers = [
-        "Flag #", "Flag Type", "Severity", "Description",
+        "Flag #", "Flag Type", "Detection Type", "Severity", "Description",
         "Source Tab", "Date Detected", "Required Action",
         "Status", "Resolved By", "Resolution Notes",
     ]
 
-    # Pre-populate with the 17 fraud rule definitions as reference
-    rules = [
-        ("F1", "Duplicate Invoice/Receipt", "Red",
-         "Invoice/Receipt ID appears more than once",
-         "Sales / Procurement"),
-        ("F2", "Paid Without Evidence", "Red",
-         "Payment status = Paid AND Evidence ref blank",
-         "Sales"),
-        ("F3", "Price Deviation (Sales)", "Yellow",
-         f"Unit price deviates >{C.THRESHOLDS['price_deviation_tolerance_pct'] * 100}% from default",
-         "Sales"),
-        ("F4", "Price Deviation (Procurement)", "Yellow",
-         "Unit cost > benchmark x 1.15",
-         "Procurement"),
-        ("F5", "Sold Exceeds Available", "Red",
-         "Eggs sold today > available stock",
-         "Sales"),
-        ("F6", "Unusual Breakage", "Yellow",
-         "Cracked % > 2x the 14-day average",
-         T("daily_cage_log")),
-        ("F7", "Unapproved Procurement", "Red",
-         f"Total > {C.THRESHOLDS['procurement_approval_threshold']} GHS AND not approved",
-         "Procurement"),
-        ("F8", "Cash Not Deposited", "Yellow",
-         "Cash received > 24 hours without deposit",
-         "Sales"),
-        ("F9", "Unverified MoMo", "Red",
-         "MoMo screenshot verified = No on paid transaction",
-         "Sales"),
-        ("F10", "Mortality Anomaly", "Yellow",
-         "Sudden spike > 2x baseline (potential theft)",
-         T("daily_cage_log")),
-        ("F11", "Feed Shrinkage", "Yellow",
-         "Feed consumed > expected + tolerance",
-         "Feed Recon"),
-        ("F12", "After-hours Access", "Red",
-         "Camera timestamp at stores outside working hours",
-         "Visitor Log"),
-        ("F13", "Unauthorized Dispatch", "Red",
-         "SC did not authorize dispatch",
-         "Sales"),
-        ("F14", "Credit Overrun", "Yellow",
-         "Customer balance exceeds credit limit",
-         "Sales/CRM"),
-        ("F15", "Requester = Approver", "Red",
-         "Same person requested and approved procurement",
-         "Procurement"),
-        ("F16", "Inventory Positive Variance", "Yellow",
-         "Physical count consistently > expected",
-         "Inventory Count"),
-        ("F17", "Withdrawal Period Violation", "Red",
-         "Eggs sold during active medication withdrawal",
-         "Medication"),
-    ]
-
     rows = []
-    for rule in rules:
+    for flag in C.FRAUD_FLAGS:
+        # flag = (flag_id, name, severity, fraud_type, description, source_tab)
         rows.append([
-            rule[0], rule[1], rule[2], rule[3], rule[4],
-            "", "Investigate and resolve", "Open", "", "",
+            flag[0],        # Flag #
+            flag[1],        # Flag Type (name)
+            flag[3],        # Detection Type (fraud_type: Type A/B/C/D/E/Cross)
+            flag[2],        # Severity
+            flag[4],        # Description
+            flag[5],        # Source Tab
+            "",             # Date Detected
+            "Investigate and resolve",  # Required Action
+            "Open",         # Status
+            "",             # Resolved By
+            "",             # Resolution Notes
         ])
 
     table_start = start_row + 2
     tab, end_row = create_excel_table(
         ws, T("fraud_flags"), headers, rows, start_row=table_start,
-        col_widths=[8, 24, 10, 45, 16, 14, 20, 12, 12, 25],
+        col_widths=[8, 28, 12, 10, 48, 18, 14, 22, 12, 12, 25],
     )
 
-    add_text_status_cf(ws, f"C{table_start + 1}:C{end_row}")
-    add_inline_dropdown(ws, f"H{table_start + 1}:H{end_row}",
+    add_text_status_cf(ws, f"D{table_start + 1}:D{end_row}")
+    add_inline_dropdown(ws, f"I{table_start + 1}:I{end_row}",
                         C.DROPDOWN_LISTS["fraud_status"])
+    add_inline_dropdown(ws, f"C{table_start + 1}:C{end_row}",
+                        C.DROPDOWN_LISTS["fraud_type"])
 
     return end_row + 2  # next free row
 
@@ -403,28 +614,37 @@ def _build_section_fraud_flags(ws, start_row):
 # ---------------------------------------------------------------------------
 
 def build_tab7_engine(wb):
-    """Build Tab 7: Engine -- Target Resolver + Reconciliation + Fraud Flags."""
+    """Build Tab 7: Engine -- Target Resolver + 5 Reconciliation Engines + Ghost Money + 41 Fraud Flags."""
     ws = wb.create_sheet(title=C.TAB_NAMES[8])
 
     row = 1
 
-    # Section A: Target Resolver
+    # Section A: Target Resolver (phase-adjusted)
     row = _build_section_target_resolver(ws, row)
 
-    # Section B: Egg Reconciliation
+    # Section B: Egg Reconciliation (lookback-limited)
     row = _build_section_recon_eggs(ws, row)
 
-    # Section C: Cash Reconciliation
+    # Section C: Cash Reconciliation (lookback-limited)
     row = _build_section_recon_cash(ws, row)
 
-    # Section D: Feed Reconciliation
+    # Section D: Feed Reconciliation (lookback-limited)
     row = _build_section_recon_feed(ws, row)
 
-    # Section E: Fraud Flags
+    # Section E: Mortality & Flock Reconciliation (NEW)
+    row = _build_section_recon_mortality(ws, row)
+
+    # Section F: Inventory Reconciliation (NEW)
+    row = _build_section_recon_inventory(ws, row)
+
+    # Section G: Ghost Money Tracker (NEW)
+    row = _build_section_ghost_money(ws, row)
+
+    # Section H: Fraud Flags (expanded 17 → 41)
     _build_section_fraud_flags(ws, row)
 
     freeze_panes(ws, "A2")
-    protect_sheet(ws, unlocked_columns=[8, 9, 10], end_row=1000)
+    protect_sheet(ws, unlocked_columns=[8, 9, 10, 11], end_row=2000)
 
-    print("  Tab 7 (Engine): Target Resolver + Reconciliation + Fraud Flags created")
+    print("  Tab 7 (Engine): Target Resolver + 5 Recon Engines + Ghost Money + 41 Fraud Flags created")
     return ws

@@ -1,8 +1,9 @@
 """
-main.py -- Orchestrator for Ultimate Farms Excel OS v2.0 (9-tab edition).
+main.py -- Orchestrator for Ultimate Farms Excel OS v3.0 (9-tab Verification Core).
 
 Usage:
     python -m build_excel_os.main
+    python -m build_excel_os.main --legacy-file "<path>"
 """
 
 import os
@@ -13,6 +14,7 @@ from openpyxl import Workbook
 
 from . import config as C
 from .sample_data import generate_all_sample_data
+from .import_legacy_data import import_all_legacy_data
 from .tab6_master_data import build_tab6_master_data
 from .tab_daily_entry import build_tab_daily_entry
 from .tab_inputs import build_inputs
@@ -22,7 +24,7 @@ from .tab1_dashboard import build_tab1_dashboard
 
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_FILE = OUTPUT_DIR / "Ultimate_Farms_Excel_OS_v2.0.xlsx"
+OUTPUT_FILE = OUTPUT_DIR / "Ultimate_Farms_Excel_OS_v3.0.xlsx"
 
 
 def apply_tab_colors(wb):
@@ -68,21 +70,36 @@ def strip_calc_chain(filepath):
 def build():
     """Main build pipeline."""
     print("=" * 60)
-    print("  Ultimate Farms Excel OS v2.0 (9-Tab) -- Build Starting")
+    print("  Ultimate Farms Excel OS v3.0 (Verification Core) -- Build Starting")
     print("=" * 60)
+
+    # Check for --legacy-file flag
+    legacy_file = None
+    if len(sys.argv) > 2 and sys.argv[1] == "--legacy-file":
+        legacy_file = sys.argv[2]
+    elif len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        # Also accept positional argument
+        legacy_file = sys.argv[1]
 
     # 1. Create workbook
     wb = Workbook()
     print("\n[1/8] Workbook created")
 
-    # 2. Generate sample data
-    print("[2/8] Generating sample data...")
-    data = generate_all_sample_data()
+    # 2. Generate or import data
+    dynamic_customers = []
+    dynamic_vendors = []
+    if legacy_file:
+        print(f"[2/8] Importing legacy data from: {legacy_file}")
+        data, dynamic_customers, dynamic_vendors = import_all_legacy_data(legacy_file)
+    else:
+        print("[2/8] Generating sample data...")
+        data = generate_all_sample_data()
     print(f"       {sum(len(v) for v in data.values() if isinstance(v, list))} total data rows generated")
 
     # 3. Build Tab 7: Master Data (must be first -- dropdowns depend on it)
     print("[3/8] Building Tab 7: Master Data (11 tables)...")
-    master_rows = build_tab6_master_data(wb)
+    master_rows = build_tab6_master_data(wb, dynamic_customers=dynamic_customers,
+                                          dynamic_vendors=dynamic_vendors)
 
     # 4. Build Tab 2: Daily Entry (production entry form)
     print("[4/8] Building Tab 2: Daily Entry (entry form)...")
@@ -92,16 +109,16 @@ def build():
     print("[5/8] Building Tabs 3-6: Input Tabs (15 tables)...")
     build_inputs(wb, data, master_rows)
 
-    # 6. Build Tab 8: Engine
-    print("[6/8] Building Tab 8: Engine (5 tables)...")
+    # 6. Build Tab 8: Engine (5 recon + Ghost Money + 41 fraud flags)
+    print("[6/8] Building Tab 8: Engine (8 sections: Target Resolver + 5 Recon + Ghost Money + 41 Fraud Flags)...")
     build_tab7_engine(wb)
 
     # 7. Build Tab 9: Analytics
-    print("[7/8] Building Tab 9: Analytics (6 sections)...")
+    print("[7/8] Building Tab 9: Analytics (7 sections incl. Ghost Money Trends)...")
     build_tab8_analytics(wb)
 
-    # 8. Build Tab 1: Dashboard
-    print("[8/8] Building Tab 1: Dashboard...")
+    # 8. Build Tab 1: Dashboard (Ghost Money + 5 recon engines)
+    print("[8/8] Building Tab 1: Dashboard (Ghost Money + 5 Recon Engines)...")
     build_tab1_dashboard(wb)
 
     # Post-processing

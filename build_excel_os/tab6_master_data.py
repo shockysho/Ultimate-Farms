@@ -256,7 +256,7 @@ def _build_owner_overrides_table(ws, current_row, master_rows):
     return end_row, max_cols
 
 
-def _build_customer_master_table(ws, current_row, master_rows):
+def _build_customer_master_table(ws, current_row, master_rows, dynamic_customers=None):
     """Table 7: tblCustomerMaster -- merged CRM + Profile."""
     table_name = T("customer_master")
     headers = [
@@ -269,8 +269,12 @@ def _build_customer_master_table(ws, current_row, master_rows):
     ]
     max_cols = len(headers)
 
+    all_customers = list(C.CUSTOMER_DATA)
+    if dynamic_customers:
+        all_customers.extend(dynamic_customers)
+
     rows = []
-    for c in C.CUSTOMER_DATA:
+    for c in all_customers:
         rows.append([
             c[0], c[1], c[2], c[3], c[4], c[5],
             c[6], c[7], c[8], c[9], c[10], c[11],
@@ -308,7 +312,7 @@ def _build_customer_master_table(ws, current_row, master_rows):
     return end_row, max_cols
 
 
-def _build_vendor_table(ws, current_row, master_rows):
+def _build_vendor_table(ws, current_row, master_rows, dynamic_vendors=None):
     """Table 8: tblVendor -- vendor / supplier master."""
     table_name = T("vendor")
     headers = [
@@ -318,8 +322,12 @@ def _build_vendor_table(ws, current_row, master_rows):
     ]
     max_cols = len(headers)
 
+    all_vendors = list(C.VENDOR_DATA)
+    if dynamic_vendors:
+        all_vendors.extend(dynamic_vendors)
+
     rows = []
-    for v in C.VENDOR_DATA:
+    for v in all_vendors:
         rows.append([v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], ""])
 
     write_section_header(ws, current_row, 1, "VENDOR / SUPPLIER MASTER", merge_end_col=max_cols)
@@ -424,7 +432,7 @@ def _build_formula_ingredients_table(ws, current_row, master_rows):
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def build_tab6_master_data(wb):
+def build_tab6_master_data(wb, dynamic_customers=None, dynamic_vendors=None):
     """Build Tab 6: Master Data -- 11 tables on one sheet. Returns master_rows dict."""
     ws = wb.create_sheet(title=C.TAB_NAMES[7])
     ws.sheet_properties.tabColor = C.TAB_COLORS[7]
@@ -457,11 +465,13 @@ def build_tab6_master_data(wb):
     current_row = end_row + 3
 
     # --- Table 7: Customer Master ---
-    end_row, _ = _build_customer_master_table(ws, current_row, master_rows)
+    end_row, _ = _build_customer_master_table(ws, current_row, master_rows,
+                                               dynamic_customers=dynamic_customers)
     current_row = end_row + 3
 
     # --- Table 8: Vendor Master ---
-    end_row, _ = _build_vendor_table(ws, current_row, master_rows)
+    end_row, _ = _build_vendor_table(ws, current_row, master_rows,
+                                      dynamic_vendors=dynamic_vendors)
     current_row = end_row + 3
 
     # --- Table 9: Item Master ---

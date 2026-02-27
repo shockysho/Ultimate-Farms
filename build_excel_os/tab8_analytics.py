@@ -1,14 +1,15 @@
 """
-tab8_analytics.py -- Tab 8: Analytics (single sheet, 6 sections).
+tab8_analytics.py -- Tab 8: Analytics (single sheet, 7 sections).
 Merges old layer5_financial.py + layer6_analytics.py.
 Sections: Chart of Accounts, Monthly P&L, Unit Economics,
-          Performance Analytics, Predictions, Cycle Count Scheduler.
+          Performance Analytics, Predictions, Cycle Count Scheduler,
+          Ghost Money Trends.
 """
 
 from datetime import timedelta
 from . import config as C
 from .config import T
-from .sample_data import DATA_START_DATE, DATA_END_DATE, NUM_DAYS
+# Date range imported from config (set at runtime by sample_data or import_legacy_data)
 from .helpers import (
     create_excel_table, protect_sheet, freeze_panes,
     write_section_header, add_traffic_light_cf, add_text_status_cf,
@@ -452,11 +453,131 @@ def _build_section_cycle_count(ws, start_row):
 
 
 # ---------------------------------------------------------------------------
+# Section G: Ghost Money Trends  (NEW -- Bible Part 2 §2.6)
+# ---------------------------------------------------------------------------
+
+def _build_section_ghost_money_trends(ws, start_row):
+    """Build Ghost Money trend analysis section. Returns next free row."""
+
+    write_section_header(ws, start_row, 1,
+                         "GHOST MONEY TRENDS -- Where Money Disappears Over Time",
+                         merge_end_col=6)
+
+    ghost = T("ghost_money")
+
+    # Period breakdown header
+    r = start_row + 2
+    period_headers = ["Component", "7-Day Total (GHS)", "30-Day Total (GHS)",
+                      "90-Day Total (GHS)", "All-Time Total (GHS)", "% of Total"]
+    for ci, h in enumerate(period_headers):
+        cell = ws.cell(row=r, column=ci + 1, value=h)
+        cell.font = C.HEADER_FONT
+        cell.fill = C.HEADER_FILL
+        cell.alignment = C.HEADER_ALIGN
+    r += 1
+
+    gm_cols = [
+        ("Feed Shrinkage", "Feed Shrinkage (GHS)"),
+        ("Mortality Over-Target", "Mortality Over-Target (GHS)"),
+        ("Egg Variance Loss", "Egg Variance Loss (GHS)"),
+        ("Cracked/Damaged", "Cracked/Damaged (GHS)"),
+        ("Price Arbitrage Missed", "Price Arbitrage Missed (GHS)"),
+        ("Cash Discrepancy", "Cash Discrepancy (GHS)"),
+        ("Inventory Carrying", "Inventory Carrying (GHS)"),
+    ]
+
+    data_start = r
+    for label, col_name in gm_cols:
+        ws.cell(row=r, column=1, value=label).font = C.SECTION_HEADER_FONT
+        # 7-day
+        cell7 = ws.cell(
+            row=r, column=2,
+            value=f'=IFERROR(SUMIFS({ghost}[{col_name}],{ghost}[Date],">="&(TODAY()-6)),0)',
+        )
+        cell7.number_format = C.FMT_CURRENCY
+        # 30-day
+        cell30 = ws.cell(
+            row=r, column=3,
+            value=f'=IFERROR(SUMIFS({ghost}[{col_name}],{ghost}[Date],">="&(TODAY()-29)),0)',
+        )
+        cell30.number_format = C.FMT_CURRENCY
+        # 90-day
+        cell90 = ws.cell(
+            row=r, column=4,
+            value=f'=IFERROR(SUMIFS({ghost}[{col_name}],{ghost}[Date],">="&(TODAY()-89)),0)',
+        )
+        cell90.number_format = C.FMT_CURRENCY
+        # All-time
+        cell_all = ws.cell(
+            row=r, column=5,
+            value=f'=IFERROR(SUM(INDIRECT("tblGhostMoney[{col_name}]")),0)',
+        )
+        cell_all.number_format = C.FMT_CURRENCY
+        # % of total
+        ws.cell(
+            row=r, column=6,
+            value=f'=IFERROR(E{r}/E{data_start + len(gm_cols)},0)',
+        ).number_format = C.FMT_PERCENT
+        r += 1
+
+    # TOTAL row
+    total_row = r
+    ws.cell(row=r, column=1, value="TOTAL GHOST MONEY").font = C.SECTION_HEADER_FONT
+    from openpyxl.utils import get_column_letter
+    for col_idx in range(2, 6):
+        col_letter = get_column_letter(col_idx)
+        cell = ws.cell(
+            row=r, column=col_idx,
+            value=f'=SUM({col_letter}{data_start}:{col_letter}{r - 1})',
+        )
+        cell.number_format = C.FMT_CURRENCY
+        cell.font = C.SECTION_HEADER_FONT
+    ws.cell(row=r, column=6, value='=1').number_format = C.FMT_PERCENT
+    r += 2
+
+    # Top 3 Ghost Money sources ranking
+    write_section_header(ws, r, 1,
+                         "TOP 3 GHOST MONEY SOURCES (30-Day Window)", merge_end_col=4)
+    r += 1
+    rank_headers = ["Rank", "Source", "30-Day Amount (GHS)", "Action"]
+    for ci, h in enumerate(rank_headers):
+        cell = ws.cell(row=r, column=ci + 1, value=h)
+        cell.font = C.HEADER_FONT
+        cell.fill = C.HEADER_FILL
+    r += 1
+
+    for rank in range(1, 4):
+        ws.cell(row=r, column=1, value=rank)
+        ws.cell(
+            row=r, column=2,
+            value=f'=IFERROR(INDEX(A{data_start}:A{data_start + len(gm_cols) - 1},'
+                  f'MATCH(LARGE(C{data_start}:C{data_start + len(gm_cols) - 1},{rank}),'
+                  f'C{data_start}:C{data_start + len(gm_cols) - 1},0)),"N/A")',
+        )
+        ws.cell(
+            row=r, column=3,
+            value=f'=IFERROR(LARGE(C{data_start}:C{data_start + len(gm_cols) - 1},{rank}),0)',
+        ).number_format = C.FMT_CURRENCY
+        ws.cell(row=r, column=4, value="Investigate root cause")
+        r += 1
+
+    # Insight note
+    r += 1
+    ws.cell(
+        row=r, column=1,
+        value="Ghost Money tracks the GAP between expected and actual value across all verification loops. "
+              "Persistent sources indicate systemic leakage -- not one-time errors.",
+    ).font = C.SECTION_HEADER_FONT
+
+    return r + 2
+
+
+# ---------------------------------------------------------------------------
 # Entry Point
 # ---------------------------------------------------------------------------
 
 def build_tab8_analytics(wb):
-    """Build Tab 8: Analytics -- 6 sections on one sheet."""
+    """Build Tab 8: Analytics -- 7 sections on one sheet."""
     ws = wb.create_sheet(title=C.TAB_NAMES[9])
 
     row = 1
@@ -466,10 +587,11 @@ def build_tab8_analytics(wb):
     row = _build_section_unit_economics(ws, row)
     row = _build_section_perf_analytics(ws, row)
     row = _build_section_predictions(ws, row)
-    _build_section_cycle_count(ws, row)
+    row = _build_section_cycle_count(ws, row)
+    _build_section_ghost_money_trends(ws, row)
 
     freeze_panes(ws, "A2")
     protect_sheet(ws)
 
-    print("  Tab 8 (Analytics): 6 sections (COA, P&L, Unit Econ, Perf, Predict, CycleCount)")
+    print("  Tab 8 (Analytics): 7 sections (COA, P&L, Unit Econ, Perf, Predict, CycleCount, Ghost Money Trends)")
     return ws

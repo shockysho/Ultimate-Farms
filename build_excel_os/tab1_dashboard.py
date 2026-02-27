@@ -1,9 +1,8 @@
 """
 tab1_dashboard.py -- Tab 1: Dashboard (Owner + Manager views on one sheet).
 
-Merges old Tab 39 (Owner Dashboard) and Tab 40 (Manager Dashboard) into a
-single "Dashboard" worksheet.  Exception-driven: Green=ignore, Yellow=investigate,
-Red=act now.
+v3.0 Verification Core: Ghost Money section added as Section A (Owner),
+5 reconciliation engines in Manager view.
 
 All table references use T("key") from config.
 """
@@ -27,6 +26,7 @@ DASH_TITLE_FONT = Font(name="Calibri", size=16, bold=True, color="1F4E79")
 DASH_SUBTITLE_FONT = Font(name="Calibri", size=11, italic=True, color="4472C4")
 KPI_LABEL_FONT = Font(name="Calibri", size=11, bold=True)
 KPI_VALUE_FONT = Font(name="Calibri", size=14, bold=True)
+GHOST_FONT = Font(name="Calibri", size=11, bold=True, color="9C0006")
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +68,7 @@ def _build_owner_section(ws, start_row):
     fraud = T("fraud_flags")
     procurement = T("procurement")
     health = T("health_incident")
+    ghost = T("ghost_money")
 
     # -- Title ---------------------------------------------------------------
     ws.merge_cells(start_row=start_row, start_column=1,
@@ -88,9 +89,102 @@ def _build_owner_section(ws, start_row):
 
     r = start_row + 3  # leave one blank row after subtitle
 
-    # ── SECTION A: BIOLOGICAL (Age-Adjusted) ────────────────────────────────
+    # ── SECTION A: GHOST MONEY TRACKER ────────────────────────────────────
     write_section_header(ws, r, 1,
-                         "A -- BIOLOGICAL PERFORMANCE (Age-Adjusted)",
+                         "A -- GHOST MONEY TRACKER (Where Money Disappears)",
+                         merge_end_col=6)
+    r += 1
+
+    gm_headers = ["Component", "Today (GHS)", "7-Day Avg (GHS)", "MTD (GHS)", "Cumulative (GHS)", "Status"]
+    for ci, h in enumerate(gm_headers):
+        cell = ws.cell(row=r, column=ci + 1, value=h)
+        cell.font = C.HEADER_FONT
+        cell.fill = C.HEADER_FILL
+        cell.alignment = C.HEADER_ALIGN
+    r += 1
+
+    # Ghost Money component column names in tblGhostMoney
+    gm_cols = [
+        ("Feed Shrinkage", "Feed Shrinkage (GHS)"),
+        ("Mortality Over-Target", "Mortality Over-Target (GHS)"),
+        ("Egg Variance Loss", "Egg Variance Loss (GHS)"),
+        ("Cracked/Damaged", "Cracked/Damaged (GHS)"),
+        ("Price Arbitrage Missed", "Price Arbitrage Missed (GHS)"),
+        ("Cash Discrepancy", "Cash Discrepancy (GHS)"),
+        ("Inventory Carrying", "Inventory Carrying (GHS)"),
+    ]
+
+    gm_yel = C.THRESHOLDS["ghost_money_daily_yellow"]
+    gm_red = C.THRESHOLDS["ghost_money_daily_red"]
+
+    gm_start = r
+    for label, col_name in gm_cols:
+        ws.cell(row=r, column=1, value=label).font = KPI_LABEL_FONT
+        # Today
+        cell_today = ws.cell(
+            row=r, column=2,
+            value=f'=IFERROR(SUMIFS({ghost}[{col_name}],{ghost}[Date],TODAY()),0)',
+        )
+        cell_today.font = KPI_VALUE_FONT
+        cell_today.number_format = C.FMT_CURRENCY
+        # 7-Day Avg
+        cell_avg = ws.cell(
+            row=r, column=3,
+            value=f'=IFERROR(AVERAGEIFS({ghost}[{col_name}],{ghost}[Date],">="&(TODAY()-6)),0)',
+        )
+        cell_avg.number_format = C.FMT_CURRENCY
+        # MTD
+        cell_mtd = ws.cell(
+            row=r, column=4,
+            value=f'=IFERROR(SUMIFS({ghost}[{col_name}],{ghost}[Date],">="&DATE(YEAR(TODAY()),MONTH(TODAY()),1)),0)',
+        )
+        cell_mtd.number_format = C.FMT_CURRENCY
+        # Cumulative (last row value)
+        cell_cum = ws.cell(
+            row=r, column=5,
+            value=f'=IFERROR(SUMIFS({ghost}[{col_name}],{ghost}[Date],">="&MIN({ghost}[Date])),0)',
+        )
+        cell_cum.number_format = C.FMT_CURRENCY
+        # Status
+        ws.cell(
+            row=r, column=6,
+            value=f'=IF(B{r}>{gm_red / 7},"Red",IF(B{r}>{gm_yel / 7},"Yellow","Green"))',
+        )
+        r += 1
+
+    # TOTAL row
+    ws.cell(row=r, column=1, value="TOTAL GHOST MONEY").font = GHOST_FONT
+    for col_idx in range(2, 6):
+        from openpyxl.utils import get_column_letter
+        col_letter = get_column_letter(col_idx)
+        cell = ws.cell(
+            row=r, column=col_idx,
+            value=f'=SUM({col_letter}{gm_start}:{col_letter}{r - 1})',
+        )
+        cell.font = GHOST_FONT
+        cell.number_format = C.FMT_CURRENCY
+    ws.cell(
+        row=r, column=6,
+        value=f'=IF(B{r}>{gm_red},"Red",IF(B{r}>{gm_yel},"Yellow","Green"))',
+    )
+    r += 1
+
+    # Ghost Money definition note
+    r += 1
+    note_cell = ws.cell(
+        row=r, column=1,
+        value='Ghost Money = value that SHOULD exist but doesn\'t. SUM(Expected - Actual) across all verification loops.',
+    )
+    note_cell.font = Font(name="Calibri", size=10, italic=True, color="808080")
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+    r += 1
+
+    add_text_status_cf(ws, f"F{gm_start}:F{r - 2}")
+
+    # ── SECTION B: BIOLOGICAL (Age-Adjusted) ────────────────────────────────
+    r += 1
+    write_section_header(ws, r, 1,
+                         "B -- BIOLOGICAL PERFORMANCE (Age-Adjusted)",
                          merge_end_col=6)
     r += 1
 
@@ -103,7 +197,6 @@ def _build_owner_section(ws, start_row):
     r += 1
 
     # Lay % = Total Eggs today / bird count, averaged over 7 days
-    # We use SUMIFS for each cohort's cages via housing cross-ref
     housing = T("housing")
     lay_formula_a = (
         f'=IFERROR(SUMPRODUCT(({prod}[Total Eggs])*({prod}[Date]>=TODAY()-6)'
@@ -122,7 +215,7 @@ def _build_owner_section(ws, start_row):
         f'/30),0)'
     )
 
-    # Thresholds for status formulas (hardcoded numerics, NOT text references)
+    # Thresholds
     mort_y = C.THRESHOLDS["mortality_daily_yellow"]
     mort_r = C.THRESHOLDS["mortality_daily_red"]
     disease_r = C.THRESHOLDS["disease_mortality_immediate_red"]
@@ -131,8 +224,6 @@ def _build_owner_section(ws, start_row):
     fcr_y = C.THRESHOLDS["fcr_peak_yellow"]
     fcr_r = C.THRESHOLDS["fcr_peak_red"]
 
-    # Each tuple: (label, value_formula, target_text, phase, trend, status_formula_template)
-    # status_formula_template uses {r} for the row number
     bio_kpis = [
         (
             "Lay % (FL2024A)",
@@ -140,7 +231,6 @@ def _build_owner_section(ws, start_row):
             f'=IFERROR(INDEX({target}[Effective Target: Lay %],MATCH("FL2024A",{target}[Cohort ID],0)),"N/A")',
             f'=IFERROR(INDEX({target}[Production Phase],MATCH("FL2024A",{target}[Cohort ID],0)),"N/A")',
             "->",
-            # Compare lay % to target from target resolver (numeric cell)
             '=IF(ISNUMBER(B{r}),IF(NOT(ISNUMBER(C{r})),"N/A",IF(B{r}>=C{r},"Green",IF(B{r}>=C{r}*0.95,"Yellow","Red"))),"N/A")',
         ),
         (
@@ -157,7 +247,6 @@ def _build_owner_section(ws, start_row):
             f'=IFERROR(INDEX({target}[Effective Target: FCR],1),"2.0")',
             "",
             "->",
-            # Lower is better for FCR
             f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}<={fcr_y},"Green",IF(B{{r}}<={fcr_r},"Yellow","Red")),"N/A")',
         ),
         (
@@ -166,7 +255,6 @@ def _build_owner_section(ws, start_row):
             f"<{mort_y}",
             "",
             "",
-            # Lower is better for mortality
             f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}<{mort_y},"Green",IF(B{{r}}<{mort_r},"Yellow","Red")),"N/A")',
         ),
         (
@@ -197,7 +285,6 @@ def _build_owner_section(ws, start_row):
             f">{large_y*100:.0f}%",
             "",
             "->",
-            # Higher is better for Large %
             f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}>={large_y},"Green",IF(B{{r}}>={large_y*0.9},"Yellow","Red")),"N/A")',
         ),
     ]
@@ -211,15 +298,14 @@ def _build_owner_section(ws, start_row):
         ws.cell(row=r, column=3, value=target_text)
         ws.cell(row=r, column=4, value=phase)
         ws.cell(row=r, column=5, value=trend)
-        # Status formula with hardcoded numeric thresholds
         ws.cell(row=r, column=6, value=status_tmpl.format(r=r))
         r += 1
 
     add_text_status_cf(ws, f"F{status_start}:F{r - 1}")
 
-    # ── SECTION B: OPERATIONAL ──────────────────────────────────────────────
+    # ── SECTION C: OPERATIONAL ──────────────────────────────────────────────
     r += 1
-    write_section_header(ws, r, 1, "B -- OPERATIONAL STATUS", merge_end_col=6)
+    write_section_header(ws, r, 1, "C -- OPERATIONAL STATUS", merge_end_col=6)
     r += 1
 
     op_headers = ["Metric", "Current", "Target", "Status"]
@@ -272,9 +358,9 @@ def _build_owner_section(ws, start_row):
 
     add_text_status_cf(ws, f"D{op_start}:D{r - 1}")
 
-    # ── SECTION C: FINANCIAL (Month-to-Date) ────────────────────────────────
+    # ── SECTION D: FINANCIAL (Month-to-Date) ────────────────────────────────
     r += 1
-    write_section_header(ws, r, 1, "C -- FINANCIAL (Month-to-Date)", merge_end_col=6)
+    write_section_header(ws, r, 1, "D -- FINANCIAL (Month-to-Date)", merge_end_col=6)
     r += 1
 
     for ci, h in enumerate(["Metric", "Current", "Target", "Status"]):
@@ -306,6 +392,15 @@ def _build_owner_section(ws, start_row):
             "<5000 GHS",
             '=IF(B{r}<5000,"Green",IF(B{r}<10000,"Yellow","Red"))',
         ),
+        (
+            "Ghost Money MTD",
+            (
+                f'=IFERROR(SUMIFS({ghost}[Daily Ghost Money (GHS)],'
+                f'{ghost}[Date],">="&DATE(YEAR(TODAY()),MONTH(TODAY()),1)),0)'
+            ),
+            "<15,000 GHS",
+            '=IF(B{r}<15000,"Green",IF(B{r}<30000,"Yellow","Red"))',
+        ),
     ]
 
     fin_start = r
@@ -321,10 +416,10 @@ def _build_owner_section(ws, start_row):
 
     add_text_status_cf(ws, f"D{fin_start}:D{r - 1}")
 
-    # ── SECTION D: FRAUD FLAGS & PENDING ACTIONS ────────────────────────────
+    # ── SECTION E: FRAUD FLAGS & PENDING ACTIONS ────────────────────────────
     r += 1
     write_section_header(ws, r, 1,
-                         "D -- FRAUD FLAGS & PENDING ACTIONS", merge_end_col=6)
+                         "E -- FRAUD FLAGS & PENDING ACTIONS", merge_end_col=6)
     r += 1
 
     for ci, h in enumerate(["Item", "Count", "Action"]):
@@ -345,6 +440,11 @@ def _build_owner_section(ws, start_row):
             "Review this week",
         ),
         (
+            "Type E (Data Massage) Flags",
+            f'=COUNTIFS({fraud}[Detection Type],"Type E",{fraud}[Status],"Open")',
+            "AI-detected -- verify manually",
+        ),
+        (
             "Pending Procurement Approvals",
             f'=COUNTIFS({procurement}[Approval Status],"Pending")',
             "Approve or reject",
@@ -362,20 +462,21 @@ def _build_owner_section(ws, start_row):
         ws.cell(row=r, column=3, value=action)
         r += 1
 
-    # ── SECTION E: NEXT ACTIONS (Priority-Ordered) ──────────────────────────
+    # ── SECTION F: NEXT ACTIONS (Priority-Ordered) ──────────────────────────
     r += 1
     write_section_header(ws, r, 1,
-                         "E -- NEXT ACTIONS (Priority-Ordered)", merge_end_col=6)
+                         "F -- NEXT ACTIONS (Priority-Ordered)", merge_end_col=6)
     r += 1
 
     actions = [
-        "1. Review cull recommendations (Prediction Engine -> Flock Registry)",
-        "2. Check feed/ingredient reorder dates (Prediction Engine)",
-        "3. Upcoming vaccinations due (Medication Log -> next dose)",
-        "4. Vet-call trigger forecast (Prediction Engine -> mortality slope)",
-        "5. Equipment maintenance due (Equipment Log -> patterns)",
-        "6. Churn-risk customers to contact (CRM -> Red churn risk)",
-        "7. Cycle counts scheduled for today (Scheduler)",
+        "1. Review Ghost Money trends -- which component is growing? (Analytics tab)",
+        "2. Review cull recommendations (Prediction Engine -> Flock Registry)",
+        "3. Check feed/ingredient reorder dates (Prediction Engine)",
+        "4. Upcoming vaccinations due (Medication Log -> next dose)",
+        "5. Vet-call trigger forecast (Prediction Engine -> mortality slope)",
+        "6. Equipment maintenance due (Equipment Log -> patterns)",
+        "7. Churn-risk customers to contact (CRM -> Red churn risk)",
+        "8. Cycle counts scheduled for today (Scheduler)",
     ]
     for action in actions:
         ws.cell(row=r, column=1, value=action)
@@ -403,6 +504,8 @@ def _build_manager_section(ws, start_row):
     recon_eggs = T("recon_eggs")
     recon_cash = T("recon_cash")
     recon_feed = T("recon_feed")
+    recon_mort = T("recon_mortality")
+    recon_inv = T("recon_inventory")
     equip = T("equipment")
     health = T("health_incident")
     procurement = T("procurement")
@@ -536,10 +639,10 @@ def _build_manager_section(ws, start_row):
         ws.cell(row=r, column=3, value=action)
         r += 1
 
-    # ── SECTION D: YESTERDAY'S RECONCILIATION ───────────────────────────────
+    # ── SECTION D: YESTERDAY'S RECONCILIATION (5 engines) ─────────────────
     r += 1
     write_section_header(ws, r, 1,
-                         "D -- YESTERDAY'S RECONCILIATION STATUS",
+                         "D -- YESTERDAY'S RECONCILIATION STATUS (5 Engines)",
                          merge_end_col=4)
     r += 1
 
@@ -581,6 +684,27 @@ def _build_manager_section(ws, start_row):
             (
                 '=IF(ISNUMBER(B{r}),IF(ABS(B{r})<25,"Green",'
                 'IF(ABS(B{r})<50,"Yellow","Red")),"N/A")'
+            ),
+        ),
+        (
+            "Mortality Reconciliation",
+            (
+                f'=IFERROR(SUMIFS({recon_mort}[Deaths Today],'
+                f'{recon_mort}[Date],TODAY()-1),"N/A")'
+            ),
+            (
+                f'=IF(ISNUMBER(B{{r}}),IF(B{{r}}<{C.THRESHOLDS["mortality_daily_yellow"]},"Green",'
+                f'IF(B{{r}}<{C.THRESHOLDS["mortality_daily_red"]},"Yellow","Red")),"N/A")'
+            ),
+        ),
+        (
+            "Inventory Reconciliation",
+            (
+                f'=IFERROR(COUNTIFS({recon_inv}[Status],"Red"),"N/A")'
+            ),
+            (
+                '=IF(ISNUMBER(B{r}),IF(B{r}=0,"Green",'
+                'IF(B{r}<=2,"Yellow","Red")),"N/A")'
             ),
         ),
     ]
@@ -639,5 +763,5 @@ def build_tab1_dashboard(wb):
     freeze_panes(ws, "A4")
     protect_sheet(ws)
 
-    print("  Tab 1: Dashboard (Owner + Manager) created")
+    print("  Tab 1: Dashboard (Owner + Manager) -- Ghost Money + 5 Recon Engines created")
     return ws

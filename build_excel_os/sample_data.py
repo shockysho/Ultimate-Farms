@@ -11,9 +11,9 @@ from . import config as C
 random.seed(42)  # Reproducible sample data
 
 # Reference date: 4 weeks ending yesterday
-DATA_END_DATE = date(2026, 2, 23)
-DATA_START_DATE = DATA_END_DATE - timedelta(days=27)
-NUM_DAYS = 28
+_DATA_END_DATE = date(2026, 2, 23)
+_DATA_START_DATE = _DATA_END_DATE - timedelta(days=27)
+_NUM_DAYS = 28
 
 # Flock age calculation helpers
 FLOCK_ARRIVAL = {
@@ -114,8 +114,13 @@ def generate_all_sample_data():
     batch_counter = 100
     proc_counter = 500
 
-    for day_offset in range(NUM_DAYS):
-        current_date = DATA_START_DATE + timedelta(days=day_offset)
+    # Set date range on config for use by Engine/Analytics builders
+    C.DATA_START_DATE = _DATA_START_DATE
+    C.DATA_END_DATE = _DATA_END_DATE
+    C.NUM_DAYS = _NUM_DAYS
+
+    for day_offset in range(_NUM_DAYS):
+        current_date = _DATA_START_DATE + timedelta(days=day_offset)
         day_of_week = current_date.weekday()  # 0=Monday
         is_weekend = day_of_week >= 5
 

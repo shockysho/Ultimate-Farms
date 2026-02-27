@@ -65,6 +65,9 @@ TABLE_NAMES = {
     "recon_feed":          "tblReconFeed",
     "recon_finished_feed": "tblReconFinishedFeed",
     "fraud_flags":         "tblFraudFlags",
+    "recon_mortality":     "tblReconMortality",
+    "recon_inventory":     "tblReconInventory",
+    "ghost_money":         "tblGhostMoney",
     # Tab 9 -- Analytics
     "chart_of_accounts":   "tblChartOfAccounts",
     "monthly_pl":          "tblMonthlyPL",
@@ -407,6 +410,14 @@ THRESHOLDS = {
     "ingredient_shrinkage_yellow": 0.02,
     "ingredient_shrinkage_red": 0.05,
     "consecutive_below_target": 14,
+    # Mortality / Flock reconciliation (Bible Part 3 Engine 4)
+    "mortality_zero_days_flag": 5,          # 0 deaths for >5 days in flock >2000 = bio improbability
+    # Inventory reconciliation (Bible Part 3 Engine 5)
+    "inventory_variance_yellow_pct": 0.03,  # 3%
+    "inventory_variance_red_pct": 0.05,     # 5%
+    # Ghost Money (Bible Part 2 §2.6)
+    "ghost_money_daily_yellow": 500,        # GHS
+    "ghost_money_daily_red": 1000,          # GHS
 }
 
 # Equipment list
@@ -503,4 +514,122 @@ DROPDOWN_LISTS = {
     "flock_status": ["Active", "Closed"],
     "qc_visual": ["Pass", "Fail"],
     "vendor_category": ["Feed ingredients", "Medications", "Fuel", "Repairs", "Equipment", "Utilities", "Other"],
+    "inventory_reason_code": ["Moisture loss", "Spillage", "Milling loss", "Theft (confirmed)", "Measurement error", "Other"],
+    "fraud_type": ["Type A", "Type B", "Type C", "Cross", "Type E"],
+}
+
+# ============================================================
+# LEGACY DATA IMPORT CONSTANTS
+# ============================================================
+LEGACY_CAGE_MAP = {
+    "Cage 1,2&3": ["H01-A", "H01-B", "H02-A", "H02-B", "H03-A", "H03-B"],
+    "Cage 4": ["H04-A", "H04-B"],
+    "Cage 5": ["H05-A", "H05-B"],
+}
+
+# Date range variables -- set at runtime by sample_data or import_legacy_data
+DATA_START_DATE = None
+DATA_END_DATE = None
+NUM_DAYS = None
+
+# Performance: only reconcile recent N days on Engine tab
+RECON_LOOKBACK_DAYS = 180
+
+# ============================================================
+# FRAUD FLAGS -- 41 flags from FarmOS Product Bible (Parts 3 & 4)
+# (flag_id, name, severity, fraud_type, description, source_tab)
+# ============================================================
+FRAUD_FLAGS = [
+    # Original F1-F17 (Excel OS v2.0)
+    ("F1",  "Duplicate Invoice/Receipt",    "Red",    "Type D", "Invoice/Receipt ID appears more than once",           "Sales / Procurement"),
+    ("F2",  "Paid Without Evidence",         "Red",    "Type D", "Payment status = Paid AND Evidence ref blank",        "Sales"),
+    ("F3",  "Price Deviation (Sales)",       "Yellow", "Type C", "Unit price deviates >15% from default tier",         "Sales"),
+    ("F4",  "Price Deviation (Procurement)", "Yellow", "Type C", "Unit cost > benchmark x 1.15",                       "Procurement"),
+    ("F5",  "Sold Exceeds Available",        "Red",    "Type A", "Eggs sold today > available stock",                   "Sales"),
+    ("F6",  "Unusual Breakage",              "Yellow", "Type A", "Cracked % > 2x the 14-day average",                  "Daily Cage Log"),
+    ("F7",  "Unapproved Procurement",        "Red",    "Cross",  "Total > 500 GHS AND not approved",                   "Procurement"),
+    ("F8",  "Cash Not Deposited",            "Yellow", "Cross",  "Cash received > 24 hours without deposit",           "Sales"),
+    ("F9",  "Unverified MoMo",               "Red",    "Type D", "MoMo screenshot verified = No on paid transaction",  "Sales"),
+    ("F10", "Mortality Anomaly",             "Yellow", "Cross",  "Sudden spike > 2x baseline (potential theft cover)",  "Daily Cage Log"),
+    ("F11", "Feed Shrinkage",                "Yellow", "Cross",  "Feed consumed > expected + tolerance",                "Feed Recon"),
+    ("F12", "After-hours Access",            "Red",    "Type B", "Camera timestamp at stores outside working hours",    "Visitor Log"),
+    ("F13", "Unauthorized Dispatch",         "Red",    "Cross",  "SC did not authorize dispatch",                       "Sales"),
+    ("F14", "Credit Overrun",                "Yellow", "Cross",  "Customer balance exceeds credit limit",               "Sales/CRM"),
+    ("F15", "Requester = Approver",          "Red",    "Cross",  "Same person requested and approved procurement",      "Procurement"),
+    ("F16", "Inventory Positive Variance",   "Yellow", "Type A", "Physical count consistently > expected",              "Inventory Count"),
+    ("F17", "Withdrawal Period Violation",   "Red",    "Cross",  "Eggs sold during active medication withdrawal",       "Medication"),
+    # Notion OS Analysis F18-F25
+    ("F18", "Scale-Count Divergence",        "Yellow", "Type A", "Scale weight vs manual count divergence >2%",         "Daily Cage Log"),
+    ("F19", "Single-Person Value Transaction","Red",   "Cross",  "High-value transaction (>1000 GHS) with single handler","Sales / Procurement"),
+    ("F20", "Handover Verification Gap",     "Yellow", "Type B", "Team handover without reconciliation verification",   "Labor"),
+    ("F21", "Biosecurity Checklist Skip",    "Yellow", "Cross",  "Biosecurity checklist not completed for the day",     "Biosecurity"),
+    ("F22", "Feed Formula Deviation",        "Yellow", "Type C", "Feed mix deviates from approved formula >5%",         "Feed Mix"),
+    ("F23", "Evening Report Delay",          "Yellow", "Type B", "Evening report not submitted by 20:00",               "Daily Cage Log"),
+    ("F24", "Egg FIFO Violation",            "Yellow", "Type C", "Older stock not sold before newer stock",             "Sales"),
+    ("F25", "Environmental Exceedance",      "Red",    "Cross",  "Temp >35C without mitigation action logged",          "Environmental"),
+    # AI Analysis F26-F34
+    ("F26", "Biological Volatility Suppression","Red", "Type E", "Unnaturally smooth data over 14-day window (STDEV below threshold)","Daily Cage Log"),
+    ("F27", "Digit Distribution Anomaly",    "Red",    "Type E", "Leading digit distribution fails Benford test (30-day window)","All numeric"),
+    ("F28", "Feed-Water Biological Mismatch","Yellow", "Type A", "Feed logged but no corresponding water consumption spike","Feed / Water"),
+    ("F29", "Space-Time Impossibility",      "Red",    "Type B", "Tasks logged closer than physical walk distance allows","Labor"),
+    ("F30", "Clean Slate Syndrome",          "Red",    "Type E", "All recon variances exactly zero at month-end",       "Engine Recon"),
+    ("F31", "Collusion Pair Detection",      "Red",    "Type E", "Same two staff verify each other >80% over 30 days",  "All"),
+    ("F32", "Data Entry Velocity Anomaly",   "Red",    "Type E", "Entry intervals <0.2s vs normal 0.8s baseline",       "All"),
+    ("F33", "Photo Quality Degradation",     "Yellow", "Type E", "Progressive blur increase in photo evidence",         "All"),
+    ("F34", "Verification Velocity Change",  "Yellow", "Type B", "Recon significantly faster than historical average",  "Engine"),
+    # Phone Protocol Flags F35-F41
+    ("F35", "Defaced Sack Missing",          "Yellow", "Type B", "Feed sack defacement photo not attached after use",   "Feed / Procurement"),
+    ("F36", "Crate Stack Photo Missing",     "Yellow", "Type B", "Crate stack topology photo not attached to sales",    "Sales"),
+    ("F37", "Receipt Audit Failed",          "Red",    "Type A", "Receipt reference does not match payment records",    "Procurement"),
+    ("F38", "Vehicle Plate Log Missing",     "Yellow", "Type B", "Vehicle license plate not logged for delivery",       "Visitor Log"),
+    ("F39", "Supplier Blind-Receive Mismatch","Red",   "Type A", "Received qty differs from PO/waybill by >5%",        "Procurement"),
+    ("F40", "Whiteboard Code Wrong",         "Yellow", "Type B", "Daily whiteboard code does not match system code",    "Daily Entry"),
+    ("F41", "Temperature Gauge Photo Missing","Yellow", "Type B", "Temperature gauge photo not attached",               "Environmental"),
+]
+
+# Ghost Money component definitions (Bible Part 2 §2.6)
+GHOST_MONEY_COMPONENTS = [
+    ("GM01", "Feed Shrinkage Loss",      "Feed consumed above expected x feed cost/kg"),
+    ("GM02", "Mortality Over-Target Loss","Deaths above breeder curve x bird replacement cost"),
+    ("GM03", "Egg Variance Loss",         "Missing eggs (expected - actual) x avg crate price"),
+    ("GM04", "Cracked/Damaged Loss",      "Cracked eggs above 2.5% baseline x crate price"),
+    ("GM05", "Price Arbitrage Missed",    "Sales below expected price tier x quantity"),
+    ("GM06", "Cash Discrepancy",          "Revenue variance from cash reconciliation"),
+    ("GM07", "Inventory Carrying Cost",   "Inventory variance x item unit cost"),
+]
+
+# Phase-dependent thresholds (Bible Part 8 §8.2)
+PHASE_THRESHOLDS = {
+    "Ramp-up": {
+        "lay_yellow_offset": -0.07,
+        "lay_red_offset": -0.10,
+        "fcr_yellow_offset": 0.2,
+        "fcr_red_offset": 0.5,
+        "feed_per_bird_range": "100-115",
+        "mortality_yellow_daily": 0.0004,
+    },
+    "Peak": {
+        "lay_yellow_abs": 0.88,
+        "lay_red_abs": 0.85,
+        "fcr_yellow_abs": 2.2,
+        "fcr_red_abs": 2.5,
+        "feed_per_bird_range": "115-118",
+        "mortality_yellow_daily": 0.0005,
+    },
+    "Post-peak": {
+        "lay_yellow_offset": -0.05,
+        "lay_red_offset": -0.07,
+        "fcr_yellow_offset": 0.2,
+        "fcr_red_offset": 0.4,
+        "feed_per_bird_range": "118-120",
+        "mortality_yellow_daily": 0.0006,
+    },
+    "Late-lay": {
+        "lay_yellow_offset": -0.07,
+        "lay_red_offset": -0.10,
+        "fcr_yellow_offset": 0.3,
+        "fcr_red_offset": 0.6,
+        "feed_per_bird_range": "120",
+        "mortality_yellow_daily": 0.0008,
+    },
 }

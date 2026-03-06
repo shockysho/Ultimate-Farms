@@ -44,3 +44,8 @@ docker-compose.override.yml
 credentials.json
 *.pem
 *.key
+
+# AI Computer Use temp files
+/tmp/ai_screenshot.png
+__pycache__/
+*.pyc

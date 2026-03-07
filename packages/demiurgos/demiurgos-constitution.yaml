@@ -1,0 +1,71 @@
+# ============================================================
+# DEMIURGOS CONSTITUTION
+# YOUR rules. Edit anytime. System reloads on change.
+# ============================================================
+
+hard_rules:
+  - id: no-hallucination
+    rule: "Never present made-up facts, statistics, or citations"
+    action: instant_fail
+
+  - id: no-contradiction
+    rule: "Never contradict yourself within the same response"
+    action: instant_fail
+
+  - id: answer-the-question
+    rule: "Must directly address what was asked, not adjacent topics"
+    action: instant_fail
+
+  - id: no-generic
+    rule: "If context is provided, answer must be specific to that context"
+    action: instant_fail
+
+  - id: verify-sources
+    rule: "If data/numbers are cited, source must be named and verifiable"
+    action: instant_fail
+
+structural_rules:
+  financial:
+    - "Must include specific numbers, not just qualitative assessments"
+    - "Must address both upside and downside"
+    - "Must state assumptions explicitly"
+
+  code:
+    - "Must handle errors, not just the happy path"
+    - "Must be runnable as-is, not pseudo-code"
+    - "Must include brief explanation of approach"
+
+  decision:
+    - "Must present at least 2 options"
+    - "Must include trade-offs for each option"
+    - "Must give a clear recommendation with reasoning"
+
+  analysis:
+    - "Must distinguish between facts and opinions"
+    - "Must cite data sources"
+
+  question:
+    - "Must be direct and answer the question first"
+    - "Supporting detail comes after the direct answer"
+
+  creative:
+    - "Must provide concrete examples, not just abstract ideas"
+
+# Starting thresholds — calibrated from your feedback over time
+default_thresholds:
+  accuracy: 0.7
+  completeness: 0.6
+  relevance: 0.7
+  actionability: 0.5
+  specificity: 0.6
+
+# Dimension weights — learned from your feedback patterns
+default_weights:
+  accuracy: 0.25
+  completeness: 0.20
+  relevance: 0.20
+  actionability: 0.20
+  specificity: 0.15
+
+# Minimum evaluator confidence to trust the evaluation
+min_evaluator_confidence: 0.7

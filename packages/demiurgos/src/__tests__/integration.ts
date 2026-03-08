@@ -93,7 +93,7 @@ async function run() {
   // ---- SECTION 1: Provider Availability ----
   console.log('--- Provider Availability ---\n');
 
-  const ollama = new OllamaProvider('mistral');
+  const ollama = new OllamaProvider('tinyllama');
   const ollamaAvailable = await ollama.isAvailable();
 
   await test('Ollama is reachable', async () => {

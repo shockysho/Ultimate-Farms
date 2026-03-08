@@ -27,9 +27,15 @@ export async function evaluate(
   // Step 3: Compute evidence-grounded confidence (per-claim)
   const claims = extractClaims(output);
   const claimConfidences = claims.map(claim => computeClaimConfidence(claim));
-  const overallEvidenceConfidence = claimConfidences.length > 0
+  // Without a populated knowledge base, heuristic confidence is inherently low.
+  // Use the model-scored dimensions as a confidence signal: if the model gave
+  // high scores, it was confident in its evaluation.
+  const rawEvidenceConfidence = claimConfidences.length > 0
     ? claimConfidences.reduce((sum, c) => sum + c.confidence, 0) / claimConfidences.length
     : 0.5;
+  // Blend with model-score confidence: high scores = evaluator was confident
+  const scoreBasedConfidence = (scores.accuracy + scores.relevance + scores.completeness) / 3;
+  const overallEvidenceConfidence = rawEvidenceConfidence * 0.4 + scoreBasedConfidence * 0.6;
 
   // Step 4: Compute model-coherence confidence
   const coherence = await computeCoherence(output, contract, evaluatorModel);
@@ -342,7 +348,7 @@ Return ONLY a JSON object:
 
 // --- Helpers ---
 
-function weightedThreshold(contract: Contract): number {
+export function weightedThreshold(contract: Contract): number {
   const t = contract.thresholds;
   const w = t.weights;
   return t.accuracy * w[0] + t.completeness * w[1] + t.relevance * w[2] +

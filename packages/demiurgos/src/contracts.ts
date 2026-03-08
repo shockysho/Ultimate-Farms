@@ -39,7 +39,9 @@ export function loadConstitution(path = 'demiurgos-constitution.yaml'): Constitu
     return {
       hard_rules: [
         { id: 'no-hallucination', rule: 'Never present made-up facts', action: 'instant_fail' },
+        { id: 'no-contradiction', rule: 'Must not contradict itself', action: 'instant_fail' },
         { id: 'answer-the-question', rule: 'Must directly address what was asked', action: 'instant_fail' },
+        { id: 'no-generic', rule: 'Must not give generic filler without substance', action: 'instant_fail' },
       ],
       structural_rules: {},
       default_thresholds: {

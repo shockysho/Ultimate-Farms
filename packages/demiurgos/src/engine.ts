@@ -4,7 +4,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { classifyTaskType, classifyComplexity, classifyDomain, generateContract } from './contracts.js';
-import { evaluate } from './evaluator.js';
+import { evaluate, weightedThreshold } from './evaluator.js';
 import { selectModel, getTiersToTry, tierName } from './router.js';
 import { logTask } from './logger.js';
 import { TaskCache } from './cache/task-cache.js';
@@ -177,10 +177,17 @@ export async function execute(prompt: string, options?: {
 
         // Try escalating the evaluator (not the model)
         const betterEvaluator = selectModel(Math.min(tier + 1, 4) as Tier, task);
-        if (betterEvaluator) {
+        if (betterEvaluator && await betterEvaluator.provider.isAvailable()) {
           const reEvaluation = await evaluate(response.content, contract, betterEvaluator.provider);
           if (reEvaluation.verdict === 'pass') {
             console.log(`  [pass] after evaluator escalation — score: ${reEvaluation.compositeScore.toFixed(2)}`);
+            if (taskCache) {
+              taskCache.store(prompt, response.content, {
+                model: config.id, tier,
+                qualityScore: reEvaluation.compositeScore,
+                confidence: reEvaluation.totalConfidence,
+              });
+            }
             return {
               id: logId,
               taskId: task.id,
@@ -194,6 +201,29 @@ export async function execute(prompt: string, options?: {
               createdAt: new Date(),
             };
           }
+        } else if (evaluation.compositeScore >= weightedThreshold(contract)) {
+          // No better evaluator available, but the score meets the threshold.
+          // Accept it — we can't get higher confidence without a better evaluator.
+          console.log(`  [accept] ${config.id} — score meets threshold (${evaluation.compositeScore.toFixed(2)}) despite low confidence`);
+          if (taskCache) {
+            taskCache.store(prompt, response.content, {
+              model: config.id, tier,
+              qualityScore: evaluation.compositeScore,
+              confidence: evaluation.totalConfidence,
+            });
+          }
+          return {
+            id: logId,
+            taskId: task.id,
+            content: response.content,
+            model: config.id,
+            tier,
+            cost,
+            evaluation,
+            cached: false,
+            duration: Date.now() - startTime,
+            createdAt: new Date(),
+          };
         }
       }
 

@@ -28,6 +28,16 @@ export const env = {
 export const models: ModelConfig[] = [
   // Tier 1: Local (FREE)
   {
+    id: 'ollama-tinyllama',
+    provider: 'ollama',
+    model: 'tinyllama',
+    tier: Tier.LOCAL,
+    costPerInputToken: 0,
+    costPerOutputToken: 0,
+    maxTokens: 2048,
+    capabilities: ['question', 'creative'],
+  },
+  {
     id: 'ollama-mistral',
     provider: 'ollama',
     model: 'mistral',

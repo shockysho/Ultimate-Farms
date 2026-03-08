@@ -2,7 +2,7 @@
 // DEMIURGOS — Anthropic Provider (Tier 2-4: Haiku/Sonnet/Opus)
 // ============================================================
 
-import Anthropic from 'anthropic';
+import Anthropic from '@anthropic-ai/sdk';
 import { BaseProvider } from './base.js';
 import { env } from '../config.js';
 import type { ProviderResponse, GenerateOptions } from '../types.js';

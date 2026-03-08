@@ -29,6 +29,7 @@ import { initInsightJournal } from '../dmn/insight-journal.js';
 import { evaluate } from '../evaluator.js';
 import { generateContract, classifyTaskType, classifyComplexity, classifyDomain } from '../contracts.js';
 import { TaskCache } from '../cache/task-cache.js';
+import { discoverOllamaModels } from '../router.js';
 import { Tier } from '../types.js';
 import { existsSync, unlinkSync } from 'node:fs';
 
@@ -84,6 +85,7 @@ async function run() {
   console.log('Testing against real providers with real API calls.\n');
 
   cleanup();
+  await discoverOllamaModels();
   initLogger(`${TEST_DB_PREFIX}ops.db`);
   initCache(`${TEST_DB_PREFIX}vectors.db`);
   initKnowledgeStore(`${TEST_DB_PREFIX}knowledge.db`);
@@ -93,7 +95,7 @@ async function run() {
   // ---- SECTION 1: Provider Availability ----
   console.log('--- Provider Availability ---\n');
 
-  const ollama = new OllamaProvider('tinyllama');
+  const ollama = new OllamaProvider('mistral');
   const ollamaAvailable = await ollama.isAvailable();
 
   await test('Ollama is reachable', async () => {

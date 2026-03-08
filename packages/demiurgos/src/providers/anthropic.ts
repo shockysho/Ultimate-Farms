@@ -46,6 +46,7 @@ export class AnthropicProvider extends BaseProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    return env.anthropicApiKey.length > 0;
+    // Reject empty keys and obvious placeholders like "sk-ant-..."
+    return env.anthropicApiKey.length > 20 && !env.anthropicApiKey.includes('...');
   }
 }

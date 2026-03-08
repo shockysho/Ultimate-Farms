@@ -46,10 +46,40 @@ export function selectModel(tier: Tier, task: Task): { config: ModelConfig; prov
   const candidates = getModelsForTier(tier, task);
   if (candidates.length === 0) return null;
 
-  // Pick cheapest available model at this tier
+  // For Ollama models, prefer ones that are actually pulled locally
+  for (const config of candidates) {
+    if (config.provider === 'ollama' && pulledOllamaModels.size > 0 && !pulledOllamaModels.has(config.model)) {
+      continue;
+    }
+    const provider = getProvider(config);
+    return { config, provider };
+  }
+
+  // Fallback: return first candidate
   const config = candidates[0];
   const provider = getProvider(config);
   return { config, provider };
+}
+
+// --- Ollama Model Discovery ---
+
+const pulledOllamaModels = new Set<string>();
+
+export async function discoverOllamaModels(): Promise<void> {
+  try {
+    const response = await fetch('http://localhost:11434/api/tags', {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (response.ok) {
+      const data = await response.json() as { models: { name: string }[] };
+      for (const m of data.models) {
+        pulledOllamaModels.add(m.name);
+        pulledOllamaModels.add(m.name.split(':')[0]);
+      }
+    }
+  } catch {
+    // Ollama not running
+  }
 }
 
 export function getMinTier(task: Task): Tier {

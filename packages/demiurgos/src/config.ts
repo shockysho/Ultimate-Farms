@@ -26,17 +26,7 @@ export const env = {
 // --- Model Registry ---
 
 export const models: ModelConfig[] = [
-  // Tier 1: Local (FREE)
-  {
-    id: 'ollama-tinyllama',
-    provider: 'ollama',
-    model: 'tinyllama',
-    tier: Tier.LOCAL,
-    costPerInputToken: 0,
-    costPerOutputToken: 0,
-    maxTokens: 2048,
-    capabilities: ['question', 'creative'],
-  },
+  // Tier 1: Local (FREE) — ordered best-to-worst
   {
     id: 'ollama-mistral',
     provider: 'ollama',
@@ -66,6 +56,16 @@ export const models: ModelConfig[] = [
     costPerOutputToken: 0,
     maxTokens: 4096,
     capabilities: ['code'],
+  },
+  {
+    id: 'ollama-tinyllama',
+    provider: 'ollama',
+    model: 'tinyllama',
+    tier: Tier.LOCAL,
+    costPerInputToken: 0,
+    costPerOutputToken: 0,
+    maxTokens: 2048,
+    capabilities: ['question', 'creative'],
   },
 
   // Tier 2: Cheap ($)

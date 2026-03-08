@@ -176,6 +176,7 @@ export async function execute(prompt: string, options?: {
         console.log(`  [uncertain] ${config.id} — evaluator not confident (${evaluation.totalConfidence.toFixed(2)}), escalating evaluator...`);
 
         // Try escalating the evaluator (not the model)
+        let escalationWorked = false;
         const betterEvaluator = selectModel(Math.min(tier + 1, 4) as Tier, task);
         if (betterEvaluator && await betterEvaluator.provider.isAvailable()) {
           const reEvaluation = await evaluate(response.content, contract, betterEvaluator.provider);
@@ -201,9 +202,11 @@ export async function execute(prompt: string, options?: {
               createdAt: new Date(),
             };
           }
-        } else if (evaluation.compositeScore >= weightedThreshold(contract)) {
-          // No better evaluator available, but the score meets the threshold.
-          // Accept it — we can't get higher confidence without a better evaluator.
+          escalationWorked = false; // Escalation tried but didn't pass
+        }
+
+        // Escalation unavailable or didn't help — accept if score meets threshold
+        if (!escalationWorked && evaluation.compositeScore >= weightedThreshold(contract)) {
           console.log(`  [accept] ${config.id} — score meets threshold (${evaluation.compositeScore.toFixed(2)}) despite low confidence`);
           if (taskCache) {
             taskCache.store(prompt, response.content, {

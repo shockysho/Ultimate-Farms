@@ -43,6 +43,7 @@ export class OpenAIProvider extends BaseProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    return env.openaiApiKey.length > 0;
+    // Reject empty keys and obvious placeholders like "sk-..."
+    return env.openaiApiKey.length > 20 && !env.openaiApiKey.includes('...');
   }
 }

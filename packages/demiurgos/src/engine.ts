@@ -7,7 +7,20 @@ import { classifyTaskType, classifyComplexity, classifyDomain, generateContract 
 import { evaluate } from './evaluator.js';
 import { selectModel, getTiersToTry, tierName } from './router.js';
 import { logTask } from './logger.js';
+import { TaskCache } from './cache/task-cache.js';
 import type { Task, Result, CostRecord, Tier, EvaluationResult, CacheHitType } from './types.js';
+
+// --- Cache Instance ---
+
+let taskCache: TaskCache | null = null;
+
+export function initCache(dbPath = 'demiurgos-vectors.db'): void {
+  taskCache = new TaskCache(dbPath);
+}
+
+export function getCache(): TaskCache | null {
+  return taskCache;
+}
 
 // --- Main Execution ---
 
@@ -21,9 +34,50 @@ export async function execute(prompt: string, options?: {
   // Step 1: Create task object with classification
   const task = createTask(prompt, options);
 
-  // Step 2: Check cache (TODO: integrate ChromaDB in Stage 2)
-  // const cached = await cache.search(prompt);
-  // if (cached) return cached;
+  // Step 2: Check cache
+  if (taskCache) {
+    const cached = taskCache.lookup(prompt);
+
+    if (cached.type === 'exact' && cached.cachedResult) {
+      console.log(`  [cache] Exact match (similarity: ${cached.similarity.toFixed(3)}) — FREE`);
+      const duration = Date.now() - startTime;
+      logTask({
+        taskId: task.id,
+        prompt: task.prompt,
+        result: cached.cachedResult,
+        modelUsed: 'cache',
+        tier: 0 as Tier,
+        costUsd: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        qualityScore: 1.0,
+        cacheHit: 'exact' as CacheHitType,
+        evidenceConfidence: 1.0,
+        coherenceConfidence: 1.0,
+        totalConfidence: 1.0,
+        durationMs: duration,
+      });
+      return {
+        id: randomUUID(),
+        taskId: task.id,
+        content: cached.cachedResult,
+        model: 'cache',
+        tier: 0 as Tier,
+        cost: { inputTokens: 0, outputTokens: 0, costUsd: 0, model: 'cache', tier: 0 as Tier },
+        evaluation: perfectEvaluation(),
+        cached: true,
+        duration,
+        createdAt: new Date(),
+      };
+    }
+
+    if (cached.type === 'adapt' && cached.cachedResult) {
+      console.log(`  [cache] Close match (similarity: ${cached.similarity.toFixed(3)}) — adapting`);
+      // For adaptation, we'll use the cached result as context for a cheap model
+      // This is handled below by prepending cached context
+      task.context = `Previously answered a similar question: "${cached.cachedPrompt}"\nAnswer: ${cached.cachedResult}\n\nAdapt this for the new question.`;
+    }
+  }
 
   // Step 3: Generate contract
   const contract = generateContract(task);
@@ -93,6 +147,16 @@ export async function execute(prompt: string, options?: {
       // Check verdict
       if (evaluation.verdict === 'pass') {
         console.log(`  [pass] ${config.id} — score: ${evaluation.compositeScore.toFixed(2)}, confidence: ${evaluation.totalConfidence.toFixed(2)}`);
+
+        // Cache the successful result
+        if (taskCache) {
+          taskCache.store(prompt, response.content, {
+            model: config.id,
+            tier,
+            qualityScore: evaluation.compositeScore,
+            confidence: evaluation.totalConfidence,
+          });
+        }
 
         return {
           id: logId,
@@ -205,5 +269,18 @@ function emptyEvaluation(): EvaluationResult {
     constitutionViolations: [],
     compositeScore: 0,
     verdict: 'fail',
+  };
+}
+
+function perfectEvaluation(): EvaluationResult {
+  return {
+    scores: { accuracy: 1, completeness: 1, relevance: 1, actionability: 1, specificity: 1 },
+    claimConfidences: [],
+    overallEvidenceConfidence: 1,
+    coherence: { chainIntegrity: 1, consistency: 1, counterArgumentResilience: 1, trackRecord: 1, overall: 1 },
+    totalConfidence: 1,
+    constitutionViolations: [],
+    compositeScore: 1,
+    verdict: 'pass',
   };
 }

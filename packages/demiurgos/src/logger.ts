@@ -168,9 +168,17 @@ export function getCostSummary(): CostSummary {
 // --- Recent Tasks ---
 
 export function getRecentTasks(limit = 10): TaskLog[] {
-  return db.prepare(
-    'SELECT * FROM task_logs ORDER BY timestamp DESC LIMIT ?'
-  ).all(limit) as TaskLog[];
+  return db.prepare(`
+    SELECT id, task_id as taskId, prompt, result,
+      model_used as modelUsed, tier, cost_usd as costUsd,
+      input_tokens as inputTokens, output_tokens as outputTokens,
+      quality_score as qualityScore, cache_hit as cacheHit,
+      evidence_confidence as evidenceConfidence,
+      coherence_confidence as coherenceConfidence,
+      total_confidence as totalConfidence,
+      duration_ms as durationMs, timestamp
+    FROM task_logs ORDER BY timestamp DESC LIMIT ?
+  `).all(limit) as TaskLog[];
 }
 
 export function getDb(): Database.Database {

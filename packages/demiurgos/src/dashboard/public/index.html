@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demiurgos — Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 20px; }
+    h1 { color: #bb86fc; margin-bottom: 20px; font-size: 1.5em; }
+    h2 { color: #03dac6; margin: 20px 0 10px; font-size: 1.1em; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .card { background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 16px; }
+    .card h3 { color: #bb86fc; margin-bottom: 8px; font-size: 0.95em; }
+    .stat { font-size: 2em; font-weight: bold; color: #03dac6; }
+    .stat-label { font-size: 0.8em; color: #888; }
+    .stat-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #222; }
+    .stat-row:last-child { border-bottom: none; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+    th { text-align: left; padding: 6px; color: #bb86fc; border-bottom: 1px solid #333; }
+    td { padding: 6px; border-bottom: 1px solid #222; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; }
+    .tag-free { background: #1b5e20; color: #a5d6a7; }
+    .tag-cheap { background: #1a237e; color: #9fa8da; }
+    .tag-mid { background: #e65100; color: #ffcc80; }
+    .tag-frontier { background: #b71c1c; color: #ef9a9a; }
+    .insight { background: #1a1a2e; border-left: 3px solid #bb86fc; padding: 12px; margin: 8px 0; border-radius: 0 4px 4px 0; }
+    .insight-score { color: #03dac6; font-weight: bold; }
+    .prompt-text { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #loading { color: #888; text-align: center; padding: 40px; }
+  </style>
+</head>
+<body>
+  <h1>DEMIURGOS — Operational Dashboard</h1>
+  <div id="loading">Loading...</div>
+  <div id="content" style="display:none;">
+
+    <div class="grid">
+      <div class="card">
+        <h3>Today</h3>
+        <div class="stat" id="today-cost">$0.00</div>
+        <div class="stat-label">spent today</div>
+        <div class="stat-row"><span>Tasks</span><span id="today-tasks">0</span></div>
+        <div class="stat-row"><span>Cache hit rate</span><span id="today-cache">0%</span></div>
+      </div>
+      <div class="card">
+        <h3>This Month</h3>
+        <div class="stat" id="month-cost">$0.00</div>
+        <div class="stat-label">spent this month</div>
+        <div class="stat-row"><span>Tasks</span><span id="month-tasks">0</span></div>
+        <div class="stat-row"><span>Cache hit rate</span><span id="month-cache">0%</span></div>
+      </div>
+      <div class="card">
+        <h3>System</h3>
+        <div class="stat-row"><span>Knowledge chunks</span><span id="knowledge-chunks">0</span></div>
+        <div class="stat-row"><span>Cache entries</span><span id="cache-entries">0</span></div>
+        <div class="stat-row"><span>DMN insights</span><span id="dmn-insights">0</span></div>
+        <div class="stat-row"><span>Learner status</span><span id="learner-status">-</span></div>
+      </div>
+    </div>
+
+    <h2>Cost by Tier</h2>
+    <div class="grid" id="tier-grid"></div>
+
+    <h2>Recent Tasks</h2>
+    <table id="tasks-table">
+      <thead><tr><th>Time</th><th>Prompt</th><th>Model</th><th>Cost</th><th>Quality</th><th>Confidence</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>DMN Insights</h2>
+    <div id="insights-container"></div>
+  </div>
+
+  <script>
+    async function fetchData(url) {
+      try { const r = await fetch(url); return await r.json(); } catch { return null; }
+    }
+
+    function tierTag(tier) {
+      const classes = { 0: 'tag-free', 1: 'tag-free', 2: 'tag-cheap', 3: 'tag-mid', 4: 'tag-frontier' };
+      const labels = { 0: 'Cache', 1: 'Local', 2: 'Cheap', 3: 'Mid', 4: 'Frontier' };
+      return `<span class="tag ${classes[tier] || 'tag-free'}">${labels[tier] || tier}</span>`;
+    }
+
+    async function refresh() {
+      const [costs, tasks, cache, knowledge, learner, dmn, insights, istats] = await Promise.all([
+        fetchData('/api/costs'),
+        fetchData('/api/tasks?limit=20'),
+        fetchData('/api/cache'),
+        fetchData('/api/knowledge'),
+        fetchData('/api/learner'),
+        fetchData('/api/dmn'),
+        fetchData('/api/insights?limit=5'),
+        fetchData('/api/insight-stats'),
+      ]);
+
+      if (costs) {
+        document.getElementById('today-cost').textContent = `$${costs.today.totalUsd.toFixed(4)}`;
+        document.getElementById('today-tasks').textContent = costs.today.taskCount;
+        document.getElementById('today-cache').textContent = `${(costs.today.cacheHitRate * 100).toFixed(1)}%`;
+        document.getElementById('month-cost').textContent = `$${costs.thisMonth.totalUsd.toFixed(4)}`;
+        document.getElementById('month-tasks').textContent = costs.thisMonth.taskCount;
+        document.getElementById('month-cache').textContent = `${(costs.thisMonth.cacheHitRate * 100).toFixed(1)}%`;
+
+        const tierGrid = document.getElementById('tier-grid');
+        tierGrid.innerHTML = (costs.byTier || []).map(t => `
+          <div class="card">
+            <h3>${tierTag(t.tier)}</h3>
+            <div class="stat">$${t.totalUsd.toFixed(4)}</div>
+            <div class="stat-label">${t.taskCount} tasks</div>
+          </div>
+        `).join('');
+      }
+
+      if (cache) document.getElementById('cache-entries').textContent = cache.totalEntries;
+      if (knowledge) document.getElementById('knowledge-chunks').textContent = knowledge.totalChunks;
+      if (istats) document.getElementById('dmn-insights').textContent = istats.totalInsights;
+      if (learner) document.getElementById('learner-status').textContent = learner.isRunning ? 'Running' : 'Idle';
+
+      if (tasks && tasks.length > 0) {
+        const tbody = document.querySelector('#tasks-table tbody');
+        tbody.innerHTML = tasks.map(t => `
+          <tr>
+            <td>${new Date(t.timestamp).toLocaleTimeString()}</td>
+            <td class="prompt-text" title="${t.prompt}">${t.prompt.slice(0, 60)}</td>
+            <td>${tierTag(t.tier)} ${t.modelUsed}</td>
+            <td>$${t.costUsd.toFixed(4)}</td>
+            <td>${t.qualityScore.toFixed(2)}</td>
+            <td>${t.totalConfidence.toFixed(2)}</td>
+          </tr>
+        `).join('');
+      }
+
+      if (insights && insights.length > 0) {
+        document.getElementById('insights-container').innerHTML = insights.map(i => `
+          <div class="insight">
+            <div><strong>${i.sourceADomain} ↔ ${i.sourceBDomain}</strong> <span class="insight-score">${i.overallScore.toFixed(2)}</span></div>
+            <div>${i.connection}</div>
+            <div style="color:#888;font-size:0.85em;margin-top:4px">${i.analogy}</div>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+    }
+
+    refresh();
+    setInterval(refresh, 10000);
+  </script>
+</body>
+</html>

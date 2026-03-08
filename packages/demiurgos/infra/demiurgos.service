@@ -1,0 +1,15 @@
+[Unit]
+Description=Demiurgos AI Orchestrator
+After=network.target
+
+[Service]
+Type=simple
+User=demiurgos
+WorkingDirectory=/opt/demiurgos
+ExecStart=/usr/bin/node dist/cli.js serve
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -6,11 +6,12 @@
 // Wander → Associate → Dream → Journal
 // Runs during deep idle (30+ minutes of no activity).
 
-import { getWanderingStore, initWanderingStore, wanderText } from './wanderer.js';
+import { getWanderingStore, initWanderingStore, wander } from './wanderer.js';
 import { findAssociations } from './association.js';
 import { dream, type DreamInsight } from './dreamer.js';
 import { saveInsight, initInsightJournal } from './insight-journal.js';
 import { getKnowledgeStore } from '../knowledge/ingestor.js';
+import { getWanderingSources, resolveAPISource } from './sources.js';
 import type { Provider } from '../types.js';
 
 export interface DMNState {
@@ -18,6 +19,7 @@ export interface DMNState {
   lastRun: Date | null;
   totalCycles: number;
   totalInsights: number;
+  totalWandered: number;
   idleMinutes: number;
 }
 
@@ -26,6 +28,7 @@ let state: DMNState = {
   lastRun: null,
   totalCycles: 0,
   totalInsights: 0,
+  totalWandered: 0,
   idleMinutes: 0,
 };
 
@@ -77,18 +80,42 @@ export async function runDMNCycle(model: Provider): Promise<DreamInsight[]> {
     const wanderingStore = getWanderingStore() ?? initWanderingStore();
     const knowledgeStore = getKnowledgeStore();
 
-    if (!knowledgeStore || knowledgeStore.size() === 0) {
-      console.log('[dmn] No knowledge base available. Skipping cycle.');
+    // Phase 1: Wander — fetch random content from curated sources
+    console.log('[dmn] Phase 1: Wandering...');
+    const sources = getWanderingSources(5);
+    let wandered = 0;
+
+    for (const source of sources) {
+      try {
+        const urls = await resolveAPISource(source);
+        for (const url of urls.slice(0, 2)) {
+          const entry = await wander(url, source.domain);
+          if (entry) {
+            wandered++;
+            console.log(`  [wander] ${source.domain}: ${url.slice(0, 80)}...`);
+          }
+        }
+      } catch {
+        // Source unavailable, skip
+      }
+    }
+
+    state.totalWandered += wandered;
+    console.log(`[dmn] Wandered ${wandered} pages`);
+
+    if (wanderingStore.size() === 0) {
+      console.log('[dmn] No wandering material available. Skipping association phase.');
       state.isRunning = false;
+      state.lastRun = new Date();
+      state.totalCycles++;
       return [];
     }
 
-    // Phase 1: Wander — already done by scheduled wandering or manual input
-    // (In production, this would fetch from random web sources)
-
-    if (wanderingStore.size() === 0) {
-      console.log('[dmn] No wandering material available. Skipping cycle.');
+    if (!knowledgeStore || knowledgeStore.size() === 0) {
+      console.log('[dmn] No knowledge base available. Skipping association phase.');
       state.isRunning = false;
+      state.lastRun = new Date();
+      state.totalCycles++;
       return [];
     }
 

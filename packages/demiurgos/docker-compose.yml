@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  # --- Ollama (Local Model Server) ---
+  ollama:
+    image: ollama/ollama:latest
+    container_name: demiurgos-ollama
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --- ChromaDB (Vector Database) ---
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: demiurgos-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --- Embedding Server (sentence-transformers on GPU) ---
+  embedding-server:
+    build:
+      context: ./embedding-server
+      dockerfile: Dockerfile
+    container_name: demiurgos-embedding
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --- Whisper Transcription Server (for YouTube ingestion) ---
+  whisper-server:
+    build:
+      context: ./transcription-server
+      dockerfile: Dockerfile
+    container_name: demiurgos-whisper
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # --- Demiurgos (Main Orchestrator + API + Dashboard) ---
+  demiurgos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: demiurgos-core
+    depends_on:
+      ollama:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      embedding-server:
+        condition: service_healthy
+    ports:
+      - "3000:3000"  # Dashboard
+      - "3001:3001"  # API
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - CHROMA_URL=http://chromadb:8000
+      - EMBEDDING_URL=http://embedding-server:8080
+      - WHISPER_URL=http://whisper-server:8081
+      - DASHBOARD_PORT=3000
+      - API_PORT=3001
+    env_file:
+      - .env
+    volumes:
+      - demiurgos-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  ollama-models:
+  chroma-data:
+  demiurgos-data:

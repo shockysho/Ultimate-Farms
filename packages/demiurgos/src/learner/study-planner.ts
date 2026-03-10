@@ -21,7 +21,7 @@ export function generateStudyPlans(gaps: KnowledgeGap[]): StudyPlan[] {
   return gaps.map((gap, index) => ({
     gap,
     searchQueries: generateQueries(gap),
-    suggestedSources: suggestSources(gap.domain),
+    suggestedSources: suggestSources(gap),
     priority: index + 1,
   }));
 }
@@ -65,40 +65,114 @@ function generateQueries(gap: KnowledgeGap): string[] {
   return [...new Set(queries)].slice(0, 5); // Deduplicate, max 5
 }
 
-function suggestSources(domain: string): string[] {
-  const sources: Record<string, string[]> = {
+/**
+ * Gap type classification for source recommendation.
+ */
+type GapType = 'factual' | 'practical' | 'technical' | 'general';
+
+/**
+ * Classify a knowledge gap by type based on description and domain.
+ */
+function classifyGapType(gap: KnowledgeGap): GapType {
+  const desc = gap.description.toLowerCase();
+  const prompts = gap.examplePrompts.join(' ').toLowerCase();
+  const combined = `${desc} ${prompts}`;
+
+  // Practical: how-to, setup, build, configure, process
+  if (/\b(how to|setup|build|configure|install|process|step|procedure|tutorial)\b/.test(combined)) {
+    return 'practical';
+  }
+
+  // Technical: code, debug, error, api, implementation
+  if (/\b(code|debug|error|api|implement|function|bug|stack trace|exception|compile)\b/.test(combined)) {
+    return 'technical';
+  }
+
+  // Factual: what is, define, explain, facts, data, statistics
+  if (/\b(what is|define|explain|fact|data|statistic|regulation|standard|specification)\b/.test(combined)) {
+    return 'factual';
+  }
+
+  // Domain-based defaults
+  if (gap.domain === 'code') return 'technical';
+  if (gap.domain === 'farming' || gap.domain === 'finance') return 'factual';
+
+  return 'general';
+}
+
+function suggestSources(gap: KnowledgeGap): string[] {
+  const gapType = classifyGapType(gap);
+
+  // Base sources by domain
+  const domainSources: Record<string, string[]> = {
     farming: [
-      'USDA poultry production guides',
-      'FAO livestock management',
-      'Poultry science journals',
-      'YouTube: poultry farming channels',
+      'usda — USDA poultry production guides (ingest-usda)',
+      'wikipedia — poultry science articles (ingest-wiki)',
+      'youtube — poultry farming channels (ingest-youtube)',
+      'web — FAO livestock management',
     ],
     finance: [
-      'Agricultural economics textbooks',
-      'Farm financial management guides',
-      'USDA economic research service',
+      'usda — USDA economic research service (ingest-usda)',
+      'wikipedia — agricultural economics (ingest-wiki)',
+      'stackexchange — personal finance SE (ingest via CLI)',
+      'web — farm financial management guides',
     ],
     engineering: [
-      'Engineering handbooks',
-      'USDA NRCS technical guides',
-      'Equipment manufacturer specs',
+      'stackexchange — engineering SE (ingest via CLI)',
+      'youtube — engineering tutorials (ingest-youtube)',
+      'usda — USDA NRCS technical guides (ingest-usda)',
+      'web — equipment manufacturer specs',
     ],
     code: [
-      'MDN Web Docs',
-      'TypeScript documentation',
-      'Stack Overflow',
+      'stackexchange — Stack Overflow (ingest via CLI)',
+      'web — MDN Web Docs, TypeScript docs',
+      'youtube — programming tutorials (ingest-youtube)',
+      'wikipedia — computing concepts (ingest-wiki)',
     ],
     management: [
-      'Farm management textbooks',
-      'ISO quality management standards',
-      'HR best practices guides',
+      'wikipedia — management practices (ingest-wiki)',
+      'web — ISO quality management standards',
+      'youtube — farm management courses (ingest-youtube)',
+      'stackexchange — workplace SE (ingest via CLI)',
     ],
     general: [
-      'Wikipedia',
-      'OpenStax textbooks',
-      'Khan Academy',
+      'wikipedia — general reference (ingest-wiki)',
+      'web — OpenStax textbooks, Khan Academy',
+      'youtube — educational channels (ingest-youtube)',
     ],
   };
 
-  return sources[domain] ?? sources.general;
+  const baseSources = domainSources[gap.domain] ?? domainSources.general;
+
+  // Prioritize sources based on gap type
+  const prioritySources: Record<GapType, string[]> = {
+    factual: [
+      'usda — official USDA documents (authority: 0.95)',
+      'wikipedia — encyclopedic reference (authority: 0.7)',
+    ],
+    practical: [
+      'youtube — video tutorials and demonstrations',
+      'web — step-by-step guides and how-tos',
+    ],
+    technical: [
+      'stackexchange — community Q&A with voted answers',
+      'web — official documentation and references',
+    ],
+    general: [
+      'wikipedia — broad topic overview',
+      'web — general web search',
+    ],
+  };
+
+  // Combine priority sources with domain sources, deduplicating
+  const priority = prioritySources[gapType];
+  const combined = [...priority, ...baseSources];
+  const seen = new Set<string>();
+
+  return combined.filter(s => {
+    const key = s.split(' — ')[0];
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 5);
 }

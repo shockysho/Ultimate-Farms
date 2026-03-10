@@ -29,10 +29,27 @@ export async function ingestWebPage(
 }
 
 /**
+ * Fetch a URL and return plain text content (without ingesting).
+ */
+export async function fetchAndExtract(url: string): Promise<string> {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
+    headers: { 'User-Agent': 'Demiurgos/0.1 (Knowledge Ingestor)' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  }
+
+  const html = await response.text();
+  return htmlToText(html);
+}
+
+/**
  * Basic HTML to text conversion. Strips tags, decodes entities,
  * preserves paragraph structure.
  */
-function htmlToText(html: string): string {
+export function htmlToText(html: string): string {
   let text = html;
 
   // Remove script and style blocks

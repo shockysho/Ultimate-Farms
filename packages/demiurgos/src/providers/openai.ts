@@ -27,19 +27,38 @@ export class OpenAIProvider extends BaseProvider {
     }
     messages.push({ role: 'user', content: prompt });
 
-    const response = await this.client.chat.completions.create({
-      model,
-      messages,
-      max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.7,
-    });
+    // Retry with exponential backoff for rate limits and transient errors
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await this.client.chat.completions.create({
+          model,
+          messages,
+          max_tokens: options?.maxTokens ?? 4096,
+          temperature: options?.temperature ?? 0.7,
+        });
 
-    return {
-      content: response.choices[0]?.message?.content ?? '',
-      inputTokens: response.usage?.prompt_tokens ?? 0,
-      outputTokens: response.usage?.completion_tokens ?? 0,
-      model,
-    };
+        return {
+          content: response.choices[0]?.message?.content ?? '',
+          inputTokens: response.usage?.prompt_tokens ?? 0,
+          outputTokens: response.usage?.completion_tokens ?? 0,
+          model,
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const isRetryable = lastError.message.includes('429') || lastError.message.includes('500') || lastError.message.includes('503');
+
+        if (isRetryable && attempt < 2) {
+          const delay = Math.pow(2, attempt + 1) * 1000;
+          console.log(`  [retry] OpenAI transient error, waiting ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+        } else {
+          throw lastError;
+        }
+      }
+    }
+
+    throw lastError ?? new Error('OpenAI generation failed after retries');
   }
 
   async isAvailable(): Promise<boolean> {

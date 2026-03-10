@@ -14,6 +14,8 @@ export const env = {
   openaiApiKey: process.env.OPENAI_API_KEY ?? '',
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
   chromaUrl: process.env.CHROMA_URL ?? 'http://localhost:8000',
+  embeddingUrl: process.env.EMBEDDING_URL ?? 'http://localhost:8080',
+  whisperUrl: process.env.WHISPER_URL ?? 'http://localhost:8081',
   dashboardPort: parseInt(process.env.DASHBOARD_PORT ?? '3000', 10),
   apiPort: parseInt(process.env.API_PORT ?? '3001', 10),
   dailyBudgetUsd: parseFloat(process.env.DAILY_BUDGET_USD ?? '5.00'),

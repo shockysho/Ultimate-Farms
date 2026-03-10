@@ -4,8 +4,12 @@
 
 import type {
   Contract, EvaluationResult, ClaimConfidence,
-  ConfidenceTier, Provider,
+  ConfidenceTier, Provider, ClaimEvidence, CoherenceResult,
 } from './types.js';
+import type { VectorStore } from './cache/vector-store.js';
+import { decomposeClaims } from './evaluator/claim-decomposer.js';
+import { traceAllClaims } from './evaluator/evidence-tracer.js';
+import { testCoherence } from './evaluator/coherence-tester.js';
 
 // --- Main Evaluation ---
 
@@ -68,6 +72,103 @@ export async function evaluate(
   return {
     scores,
     claimConfidences,
+    overallEvidenceConfidence,
+    coherence,
+    totalConfidence,
+    constitutionViolations: violations,
+    compositeScore,
+    verdict,
+  };
+}
+
+// --- Evidence-Grounded Evaluation ---
+
+/**
+ * Evaluate output with full evidence-grounded confidence scoring.
+ *
+ * Unlike `evaluate()` which uses model-assisted scoring, this function
+ * uses the claim decomposer, evidence tracer, and coherence tester
+ * for structured, knowledge-base-backed confidence assessment.
+ *
+ * The existing `evaluate()` function is preserved for backward compatibility.
+ */
+export async function evaluateWithEvidence(
+  content: string,
+  contract: Contract,
+  knowledgeStore: VectorStore | null,
+  evaluatorModel?: Provider,
+): Promise<EvaluationResult> {
+  // Step 1: Check constitution (hard rules) — instant fail
+  const violations = checkConstitution(content, contract);
+
+  if (violations.length > 0) {
+    return failResult(violations);
+  }
+
+  // Step 2: Score dimensions (model-assisted if available, heuristic fallback)
+  let scores: EvaluationResult['scores'];
+  if (evaluatorModel) {
+    scores = await scoreDimensions(content, contract, evaluatorModel);
+  } else {
+    scores = heuristicScore(content, contract);
+  }
+
+  // Step 3: Decompose output into structured claims
+  const structuredClaims = decomposeClaims(content);
+
+  // Step 4: Trace evidence for each claim against knowledge base
+  const claimEvidences = traceAllClaims(structuredClaims, knowledgeStore);
+
+  // Step 5: Test coherence using heuristics (no LLM needed)
+  const coherence: CoherenceResult = testCoherence(content);
+
+  // Step 6: Compute per-claim evidence confidence (weighted average)
+  const rawEvidenceConfidence = claimEvidences.length > 0
+    ? claimEvidences.reduce((sum, ce) => sum + ce.confidence, 0) / claimEvidences.length
+    : 0.5;
+
+  // Blend with dimension scores as a confidence signal
+  const scoreBasedConfidence = (scores.accuracy + scores.relevance + scores.completeness) / 3;
+  const overallEvidenceConfidence = rawEvidenceConfidence * 0.6 + scoreBasedConfidence * 0.4;
+
+  // Step 7: Combine evidence + coherence into total confidence
+  const totalConfidence = (overallEvidenceConfidence * 0.6) + (coherence.overall * 0.4);
+
+  // Step 8: Compute composite score
+  const w = contract.thresholds.weights;
+  const compositeScore =
+    scores.accuracy * w[0] +
+    scores.completeness * w[1] +
+    scores.relevance * w[2] +
+    scores.actionability * w[3] +
+    scores.specificity * w[4];
+
+  // Step 9: Determine verdict
+  const meetsThreshold = compositeScore >= weightedThreshold(contract);
+  const confidenceIsHigh = totalConfidence >= contract.minEvaluatorConfidence;
+
+  let verdict: 'pass' | 'fail' | 'uncertain';
+  if (meetsThreshold && confidenceIsHigh) {
+    verdict = 'pass';
+  } else if (!meetsThreshold && confidenceIsHigh) {
+    verdict = 'fail';
+  } else {
+    verdict = 'uncertain'; // Escalate evaluator, not model
+  }
+
+  // Build legacy claimConfidences for backward compatibility
+  const claimConfidences: ClaimConfidence[] = claimEvidences.map(ce => ({
+    claim: ce.claim.text,
+    tier: ce.tier,
+    confidence: ce.confidence,
+    sources: ce.sources,
+    reason: ce.reason,
+  }));
+
+  return {
+    scores,
+    claimConfidences,
+    claimEvidences,
     overallEvidenceConfidence,
     coherence,
     totalConfidence,

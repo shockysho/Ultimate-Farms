@@ -2,14 +2,15 @@
 // DEMIURGOS — Embedding Generation
 // ============================================================
 //
-// Two modes:
-// 1. Local sentence-transformers via Python (when GPU available)
-// 2. Simple TF-IDF-like embeddings (fallback, no dependencies)
+// Three modes:
+// 1. Embedding server (sentence-transformers via HTTP, 384-dim)
+// 2. Simple TF-IDF-like embeddings (fallback, no dependencies, 128-dim)
 //
-// The fallback is not as good as real embeddings but enables
-// functional caching without any external dependencies.
+// The EmbeddingClient connects to the embedding-server for real
+// semantic embeddings. Falls back to hash-based when unavailable.
 
 const EMBEDDING_DIM = 128;
+const SERVER_EMBEDDING_DIM = 384;
 
 /**
  * Generate a simple hash-based embedding for text.
@@ -71,6 +72,142 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 
 export function getEmbeddingDim(): number {
   return EMBEDDING_DIM;
+}
+
+// --- EmbeddingClient (connects to embedding-server) ---
+
+/**
+ * Client for the Demiurgos embedding server.
+ * Provides real sentence-transformer embeddings via HTTP.
+ * Falls back to hash-based embeddings when the server is unavailable.
+ */
+export class EmbeddingClient {
+  private static instance: EmbeddingClient | null = null;
+  private url: string;
+  private available: boolean | null = null;
+
+  private constructor(url?: string) {
+    this.url = url || process.env.EMBEDDING_URL || 'http://localhost:8080';
+  }
+
+  /**
+   * Get the singleton EmbeddingClient instance.
+   */
+  static getInstance(url?: string): EmbeddingClient {
+    if (!EmbeddingClient.instance) {
+      EmbeddingClient.instance = new EmbeddingClient(url);
+    }
+    return EmbeddingClient.instance;
+  }
+
+  /**
+   * Reset the singleton (useful for testing).
+   */
+  static resetInstance(): void {
+    EmbeddingClient.instance = null;
+  }
+
+  /**
+   * Check if the embedding server is available.
+   */
+  async isAvailable(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.url}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000),
+      });
+      this.available = response.ok;
+      return this.available;
+    } catch {
+      this.available = false;
+      return false;
+    }
+  }
+
+  /**
+   * Embed a single text string.
+   * Returns a 384-dim vector from the server, or falls back to hash-based 128-dim.
+   */
+  async embed(text: string): Promise<number[]> {
+    // Check availability if not yet determined
+    if (this.available === null) {
+      await this.isAvailable();
+    }
+
+    if (!this.available) {
+      console.warn('[Demiurgos] Embedding server unavailable, using hash-based fallback');
+      return simpleEmbed(text);
+    }
+
+    try {
+      const response = await fetch(`${this.url}/embed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Embedding server returned ${response.status}`);
+      }
+
+      const data = (await response.json()) as { embedding: number[]; dim: number };
+      return data.embedding;
+    } catch (error) {
+      console.warn('[Demiurgos] Embedding server error, falling back to hash-based:', error);
+      this.available = false;
+      return simpleEmbed(text);
+    }
+  }
+
+  /**
+   * Embed a batch of texts.
+   * Returns array of 384-dim vectors from the server, or falls back to hash-based.
+   */
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    if (this.available === null) {
+      await this.isAvailable();
+    }
+
+    if (!this.available) {
+      console.warn('[Demiurgos] Embedding server unavailable, using hash-based fallback');
+      return texts.map(simpleEmbed);
+    }
+
+    try {
+      const response = await fetch(`${this.url}/embed/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Embedding server returned ${response.status}`);
+      }
+
+      const data = (await response.json()) as { embeddings: number[][]; dim: number; count: number };
+      return data.embeddings;
+    } catch (error) {
+      console.warn('[Demiurgos] Embedding server error, falling back to hash-based:', error);
+      this.available = false;
+      return texts.map(simpleEmbed);
+    }
+  }
+
+  /**
+   * Get the embedding dimension based on current mode.
+   */
+  getEmbeddingDim(): number {
+    return this.available ? SERVER_EMBEDDING_DIM : EMBEDDING_DIM;
+  }
+
+  /**
+   * Whether the client is currently using real embeddings.
+   */
+  isUsingRealEmbeddings(): boolean {
+    return this.available === true;
+  }
 }
 
 // --- Helpers ---

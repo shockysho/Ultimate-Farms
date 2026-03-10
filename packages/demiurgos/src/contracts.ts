@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 import { randomUUID } from 'node:crypto';
 import { defaultThresholds, taskTypeKeywords } from './config.js';
+import { getCalibrated } from './feedback/calibrator.js';
 import type {
   Contract, Task, TaskType, TaskComplexity,
   ConstitutionRule, DimensionThresholds, Tier,
@@ -120,23 +121,33 @@ export function generateContract(task: Task): Contract {
 
   const structuralRules = constitution.structural_rules[task.type] ?? [];
 
-  // Load thresholds — from learned preferences if available, else defaults
-  const ct = constitution.default_thresholds;
-  const cw = constitution.default_weights;
-  const thresholds: DimensionThresholds = {
-    accuracy: ct.accuracy ?? defaultThresholds.accuracy,
-    completeness: ct.completeness ?? defaultThresholds.completeness,
-    relevance: ct.relevance ?? defaultThresholds.relevance,
-    actionability: ct.actionability ?? defaultThresholds.actionability,
-    specificity: ct.specificity ?? defaultThresholds.specificity,
-    weights: [
-      cw.accuracy ?? 0.25,
-      cw.completeness ?? 0.20,
-      cw.relevance ?? 0.20,
-      cw.actionability ?? 0.20,
-      cw.specificity ?? 0.15,
-    ],
-  };
+  // Load thresholds — from calibrated feedback if available, else constitution defaults
+  let thresholds: DimensionThresholds;
+
+  try {
+    const calibrated = getCalibrated(task.type, task.domain);
+    // getCalibrated returns defaults if no calibration exists, but if calibrated
+    // values differ from defaults, they came from real calibration data
+    thresholds = calibrated;
+  } catch {
+    // Fallback to constitution defaults if feedback tables not initialized
+    const ct = constitution.default_thresholds;
+    const cw = constitution.default_weights;
+    thresholds = {
+      accuracy: ct.accuracy ?? defaultThresholds.accuracy,
+      completeness: ct.completeness ?? defaultThresholds.completeness,
+      relevance: ct.relevance ?? defaultThresholds.relevance,
+      actionability: ct.actionability ?? defaultThresholds.actionability,
+      specificity: ct.specificity ?? defaultThresholds.specificity,
+      weights: [
+        cw.accuracy ?? 0.25,
+        cw.completeness ?? 0.20,
+        cw.relevance ?? 0.20,
+        cw.actionability ?? 0.20,
+        cw.specificity ?? 0.15,
+      ],
+    };
+  }
 
   // Determine required elements based on task type
   const requiredElements = getRequiredElements(task.type);

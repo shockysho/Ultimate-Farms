@@ -125,6 +125,29 @@ export interface ClaimConfidence {
   reason: string;
 }
 
+// --- Evidence-Grounded Confidence Types ---
+
+export interface Claim {
+  text: string;
+  type: 'factual' | 'recommendation' | 'inference' | 'opinion';
+}
+
+export interface ClaimEvidence {
+  claim: Claim;
+  tier: ConfidenceTier;
+  confidence: number;
+  sources: string[];
+  reason: string;
+}
+
+export interface CoherenceResult {
+  chainIntegrity: number;
+  consistency: number;
+  counterArgumentResilience: number;
+  trackRecord: number;
+  overall: number;
+}
+
 export interface EvaluationResult {
   scores: {
     accuracy: number;
@@ -134,18 +157,15 @@ export interface EvaluationResult {
     specificity: number;
   };
 
-  // Evidence-grounded confidence (per-claim)
+  // Evidence-grounded confidence (per-claim) — legacy string-based
   claimConfidences: ClaimConfidence[];
   overallEvidenceConfidence: number;
 
+  // Evidence-grounded confidence (structured claims with evidence tracing)
+  claimEvidences?: ClaimEvidence[];
+
   // Model-coherence confidence
-  coherence: {
-    chainIntegrity: number;
-    consistency: number;
-    counterArgumentResilience: number;
-    trackRecord: number;
-    overall: number;
-  };
+  coherence: CoherenceResult;
 
   // Combined
   totalConfidence: number;

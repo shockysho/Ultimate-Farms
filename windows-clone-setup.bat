@@ -21,8 +21,13 @@ echo Git found:
 git --version
 echo.
 
-:: Set target directory
-set "TARGET=C:\Users\shola\OneDrive\Desktop\Ultimate-Farms"
+:: Set target directory (works for any user, not just shola)
+set "TARGET=%USERPROFILE%\OneDrive\Desktop\Ultimate-Farms"
+
+:: Check if OneDrive Desktop exists, fall back to regular Desktop
+if not exist "%USERPROFILE%\OneDrive\Desktop" (
+    set "TARGET=%USERPROFILE%\Desktop\Ultimate-Farms"
+)
 
 :: Check if already cloned
 if exist "%TARGET%\.git" (
@@ -34,12 +39,15 @@ if exist "%TARGET%\.git" (
     git pull origin main
     echo.
     echo Done! Your repo is up to date.
-    pause
+    echo.
+    echo Launching Demiurgos setup...
+    cd /d "%TARGET%\packages\demiurgos"
+    call setup-windows.bat
     exit /b 0
 )
 
 :: Clone the repo
-echo Cloning Ultimate-Farms to your OneDrive Desktop...
+echo Cloning Ultimate-Farms to your Desktop...
 echo   %TARGET%
 echo.
 git clone https://github.com/shockysho/Ultimate-Farms.git "%TARGET%"
@@ -58,10 +66,7 @@ echo ============================================
 echo.
 echo Location: %TARGET%
 echo.
-echo Next steps:
-echo   1. Install Node.js from https://nodejs.org/ (LTS version)
-echo   2. Open a terminal in the Ultimate-Farms folder
-echo   3. Run: npm install
-echo   4. Run: npm run dev
+echo Now launching Demiurgos setup...
 echo.
-pause
+cd /d "%TARGET%\packages\demiurgos"
+call setup-windows.bat

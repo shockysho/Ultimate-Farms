@@ -4,11 +4,12 @@
 
 import { randomUUID } from 'node:crypto';
 import { classifyTaskType, classifyComplexity, classifyDomain, generateContract } from './contracts.js';
-import { evaluate, weightedThreshold } from './evaluator.js';
+import { evaluate, evaluateWithEvidence, weightedThreshold } from './evaluator.js';
 import { selectModel, getTiersToTry, tierName } from './router.js';
 import { logTask } from './logger.js';
 import { TaskCache } from './cache/task-cache.js';
-import type { Task, Result, CostRecord, Tier, EvaluationResult, CacheHitType } from './types.js';
+import { Tier } from './types.js';
+import type { Task, Result, CostRecord, EvaluationResult, CacheHitType } from './types.js';
 
 // --- Cache Instance ---
 
@@ -119,10 +120,16 @@ export async function execute(prompt: string, options?: {
       };
 
       // Evaluate against contract
-      // Use cheapest available model as evaluator (or self-evaluate for Tier 1)
-      const evaluatorSelection = selectModel(Math.max(tier, 1) as Tier, task);
-      const evaluatorProvider = evaluatorSelection?.provider ?? provider;
-      const evaluation = await evaluate(response.content, contract, evaluatorProvider);
+      let evaluation: EvaluationResult;
+      if (tier === Tier.LOCAL) {
+        // For local models, use heuristic evaluation (no LLM self-eval — 7B models
+        // can't reliably produce the strict JSON the evaluator expects)
+        evaluation = await evaluateWithEvidence(response.content, contract, null);
+      } else {
+        const evaluatorSelection = selectModel(Math.max(tier, 1) as Tier, task);
+        const evaluatorProvider = evaluatorSelection?.provider ?? provider;
+        evaluation = await evaluate(response.content, contract, evaluatorProvider);
+      }
 
       const duration = Date.now() - startTime;
 

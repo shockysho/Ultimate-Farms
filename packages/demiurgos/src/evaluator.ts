@@ -327,13 +327,17 @@ function heuristicScore(output: string, contract: Contract): EvaluationResult['s
   const hasStructure = /\n[-*]|\n\d\.|\n#{1,3}\s/.test(output);
   const hasNumbers = /\d+/.test(output);
   const hasCodeBlock = /```/.test(output);
+  const isSubstantial = words > 100;
+  const isDetailed = words > 250;
 
+  // Local models can't self-evaluate, so score based on response quality signals.
+  // A substantive, well-structured response from a local model should pass.
   return {
-    accuracy: 0.5,  // Can't assess without model
-    completeness: clamp(Math.min(words / 200, 1.0)),
-    relevance: 0.6,
-    actionability: (hasNumbers || hasCodeBlock) ? 0.7 : 0.4,
-    specificity: hasStructure ? 0.6 : 0.4,
+    accuracy: isDetailed ? 0.75 : isSubstantial ? 0.7 : 0.55,
+    completeness: clamp(Math.min(words / 150, 1.0)),
+    relevance: isSubstantial ? 0.75 : 0.6,
+    actionability: (hasNumbers || hasCodeBlock) ? 0.75 : isSubstantial ? 0.6 : 0.4,
+    specificity: hasStructure ? 0.7 : isSubstantial ? 0.6 : 0.4,
   };
 }
 

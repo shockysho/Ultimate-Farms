@@ -160,10 +160,15 @@ echo -e "     The AI sees YOUR actual screen and controls YOUR mouse/keyboard."
 echo -e "     More powerful — it can use all your logged-in apps."
 echo -e "     But it's operating your real computer, so be attentive."
 echo ""
-echo -e "  ${BOLD}3) Just install everything, I'll choose later${NC}"
+echo -e "  ${BOLD}3) Free Local AI — Ollama (No API key needed)${NC}"
+echo -e "     Uses a free AI model that runs on YOUR machine."
+echo -e "     Lower quality than Claude, but completely free."
+echo -e "     Needs ~8GB RAM. Run: ${BOLD}bash setup-ollama.sh${NC}"
+echo ""
+echo -e "  ${BOLD}4) Just install everything, I'll choose later${NC}"
 echo ""
 
-read -p "  Enter 1, 2, or 3: " CHOICE
+read -p "  Enter 1, 2, 3, or 4: " CHOICE
 echo ""
 
 case $CHOICE in
@@ -226,6 +231,14 @@ case $CHOICE in
         echo ""
         ;;
     3)
+        echo -e "${GREEN}Setting up free local AI with Ollama...${NC}"
+        echo ""
+        echo "  This will run the Ollama setup script."
+        echo ""
+        bash "$(dirname "$0")/setup-ollama.sh"
+        exit 0
+        ;;
+    4)
         echo -e "${GREEN}Everything installed. You're ready to go.${NC}"
         echo ""
         echo -e "  To use Docker sandbox: re-run this script and pick option 1"
@@ -244,4 +257,8 @@ echo "Next steps:"
 echo "  1. Read docs/AI_WORKSPACE_SETUP.md for the full guide"
 echo "  2. Read docs/COMPUTER_USE_INSTRUCTIONS.md for how to give the AI tasks"
 echo "  3. Start with simple tasks and work up to complex ones"
+echo ""
+echo "Free alternative (no API key):"
+echo "  bash setup-ollama.sh          # One-time setup"
+echo "  python3 ollama_screen_agent.py  # Run the free AI"
 echo ""

@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demiurgos Dashboard</title>
+  <style>
+    /* ── CSS Variables ─────────────────────────────────────── */
+    :root {
+      --bg: #0a0a0a;
+      --bg-card: #1a1a2e;
+      --bg-card-alt: #16213e;
+      --bg-row-hover: #1f1f3a;
+      --accent: #00d4ff;
+      --success: #00ff88;
+      --warning: #ffaa00;
+      --error: #ff4444;
+      --text: #e0e0e0;
+      --text-dim: #888;
+      --text-dimmer: #555;
+      --border: #2a2a4a;
+      --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius: 8px;
+    }
+
+    /* ── Reset & Base ──────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 14px; }
+
+    body {
+      font-family: var(--font-mono);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .dashboard {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .header .subtitle {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    .refresh-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .refresh-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .refresh-dot.loading {
+      background: var(--warning);
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── Grid Rows ─────────────────────────────────────────── */
+    .row {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .row-4 { grid-template-columns: repeat(4, 1fr); }
+    .row-2 { grid-template-columns: repeat(2, 1fr); }
+    .row-1 { grid-template-columns: 1fr; }
+
+    @media (max-width: 1100px) {
+      .row-4 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .row-4, .row-2 { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards ──────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+      opacity: 0.5;
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    /* ── Metric Cards (Top Row) ────────────────────────────── */
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+
+    .metric-value.accent { color: var(--accent); }
+    .metric-value.success { color: var(--success); }
+    .metric-value.warning { color: var(--warning); }
+    .metric-value.error { color: var(--error); }
+
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .metric-breakdown {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+    }
+
+    .metric-breakdown .label { color: var(--text-dim); }
+    .metric-breakdown .value { color: var(--text); font-weight: 600; }
+
+    /* ── Panel Titles ──────────────────────────────────────── */
+    .panel-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title .badge {
+      font-size: 0.7rem;
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2px 10px;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+
+    /* ── Bar Charts (CSS-only) ─────────────────────────────── */
+    .bar-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .bar-label {
+      width: 110px;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-align: right;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 22px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      min-width: 2px;
+      transition: width 0.6s ease;
+      position: relative;
+    }
+
+    .bar-fill.tier-0 { background: linear-gradient(90deg, #00ff88, #00cc66); }
+    .bar-fill.tier-1 { background: linear-gradient(90deg, #00ff88, #00cc66); }
+    .bar-fill.tier-2 { background: linear-gradient(90deg, #00d4ff, #0099cc); }
+    .bar-fill.tier-3 { background: linear-gradient(90deg, #ffaa00, #cc8800); }
+    .bar-fill.tier-4 { background: linear-gradient(90deg, #ff4444, #cc2222); }
+    .bar-fill.cache-exact { background: linear-gradient(90deg, #00ff88, #00cc66); }
+    .bar-fill.cache-adapt { background: linear-gradient(90deg, #00d4ff, #0099cc); }
+    .bar-fill.cache-miss { background: linear-gradient(90deg, #ff4444, #cc2222); }
+
+    .bar-value {
+      width: 80px;
+      font-size: 0.75rem;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+
+    /* ── Tables ─────────────────────────────────────────────── */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 10px 12px;
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    thead th:hover { color: var(--text); }
+
+    tbody td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      white-space: nowrap;
+    }
+
+    tbody tr:hover { background: var(--bg-row-hover); }
+
+    .prompt-cell {
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+
+    /* ── Tags ───────────────────────────────────────────────── */
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .tag-cache   { background: rgba(0,255,136,0.15); color: var(--success); }
+    .tag-local   { background: rgba(0,255,136,0.1); color: #66ffaa; }
+    .tag-cheap   { background: rgba(0,212,255,0.15); color: var(--accent); }
+    .tag-mid     { background: rgba(255,170,0,0.15); color: var(--warning); }
+    .tag-frontier{ background: rgba(255,68,68,0.15); color: var(--error); }
+
+    .tag-hit     { background: rgba(0,255,136,0.15); color: var(--success); }
+    .tag-adapt   { background: rgba(0,212,255,0.15); color: var(--accent); }
+    .tag-miss    { background: rgba(255,255,255,0.06); color: var(--text-dim); }
+
+    /* ── Insight Cards ─────────────────────────────────────── */
+    .insight-card {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+
+    .insight-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .insight-domains {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .insight-score {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .score-high   { background: rgba(0,255,136,0.15); color: var(--success); }
+    .score-medium { background: rgba(255,170,0,0.15); color: var(--warning); }
+    .score-low    { background: rgba(255,68,68,0.15); color: var(--error); }
+
+    .insight-connection {
+      font-size: 0.8rem;
+      color: var(--text);
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .insight-analogy {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* ── Knowledge Table ───────────────────────────────────── */
+    .knowledge-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.8rem;
+    }
+
+    .knowledge-item:last-child { border-bottom: none; }
+
+    .knowledge-domain {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Pagination ────────────────────────────────────────── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
+      font-size: 0.8rem;
+    }
+
+    .pagination button {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      transition: all 0.2s;
+    }
+
+    .pagination button:hover:not(:disabled) {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    .pagination button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .pagination .page-info {
+      color: var(--text-dim);
+      padding: 0 8px;
+    }
+
+    /* ── Empty State ───────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+
+    /* ── Feedback Section ──────────────────────────────────── */
+    .feedback-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .feedback-stat {
+      text-align: center;
+      padding: 12px;
+      background: rgba(255,255,255,0.02);
+      border-radius: var(--radius);
+    }
+
+    .feedback-stat .fb-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+
+    .feedback-stat .fb-label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* ── Model Percentage Bars ─────────────────────────────── */
+    .model-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 0.8rem;
+    }
+
+    .model-name {
+      width: 130px;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+
+    .model-bar-track {
+      flex: 1;
+      height: 18px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .model-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.6s ease;
+      display: flex;
+      align-items: center;
+      padding-left: 6px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--bg);
+      min-width: 2px;
+    }
+
+    .model-stats {
+      width: 120px;
+      flex-shrink: 0;
+      text-align: right;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Duration formatting ───────────────────────────────── */
+    .duration { color: var(--text-dim); }
+    .cost { color: var(--accent); }
+    .quality-good { color: var(--success); }
+    .quality-ok { color: var(--warning); }
+    .quality-bad { color: var(--error); }
+
+    /* ── Loading overlay ───────────────────────────────────── */
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.4s;
+    }
+
+    #loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-text {
+      color: var(--accent);
+      font-size: 1.2rem;
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+    }
+
+    .loading-bar {
+      width: 200px;
+      height: 2px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .loading-bar-inner {
+      width: 40%;
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      animation: loadSlide 1.2s ease-in-out infinite;
+    }
+
+    @keyframes loadSlide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay">
+    <div class="loading-text">DEMIURGOS</div>
+    <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+  </div>
+
+  <div class="dashboard">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1>Demiurgos</h1>
+        <span class="subtitle">Operational Dashboard</span>
+      </div>
+      <div class="header-right">
+        <span id="last-updated">--</span>
+        <div class="refresh-indicator">
+          <div class="refresh-dot" id="refresh-dot"></div>
+          <span id="refresh-label">Auto-refresh: 30s</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Row 1: Top Metric Cards -->
+    <div class="row row-4">
+      <div class="card">
+        <div class="card-title">Total Cost Today</div>
+        <div class="metric-value accent" id="cost-today">$0.0000</div>
+        <div class="metric-sub" id="cost-today-tasks">0 tasks</div>
+        <div class="metric-breakdown">
+          <div><span class="label">Week: </span><span class="value" id="cost-week">$0.0000</span></div>
+          <div><span class="label">Month: </span><span class="value" id="cost-month">$0.0000</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Cache Hit Rate</div>
+        <div class="metric-value success" id="cache-rate">0.0%</div>
+        <div class="metric-sub" id="cache-entries">0 entries cached</div>
+        <div class="metric-breakdown">
+          <div><span class="label">Exact: </span><span class="value" id="cache-exact">0</span></div>
+          <div><span class="label">Adapt: </span><span class="value" id="cache-adapt">0</span></div>
+          <div><span class="label">Miss: </span><span class="value" id="cache-miss">0</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Tasks Completed</div>
+        <div class="metric-value accent" id="tasks-total">0</div>
+        <div class="metric-sub" id="tasks-sub">all time</div>
+        <div class="metric-breakdown">
+          <div><span class="label">Failures: </span><span class="value" id="quality-failures">0%</span></div>
+          <div><span class="label">Escalations: </span><span class="value" id="quality-escalations">0%</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Avg Quality Score</div>
+        <div class="metric-value success" id="quality-score">0.00</div>
+        <div class="metric-sub" id="quality-confidence">confidence: 0.00</div>
+        <div class="metric-breakdown">
+          <div><span class="label">Evidence: </span><span class="value" id="quality-evidence">0.00</span></div>
+          <div><span class="label">Coherence: </span><span class="value" id="quality-coherence">0.00</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Cost Chart + Cache Performance -->
+    <div class="row row-2">
+      <div class="card">
+        <div class="panel-title">
+          Cost by Model Tier
+          <span class="badge" id="tier-total-badge">$0.0000 total</span>
+        </div>
+        <div class="bar-chart" id="tier-chart">
+          <div class="empty-state">No cost data yet</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="panel-title">
+          Cache Performance
+          <span class="badge" id="cache-savings-badge">$0.0000 saved</span>
+        </div>
+        <div class="bar-chart" id="cache-chart">
+          <div class="empty-state">No cache data yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Knowledge Base + DMN Insights -->
+    <div class="row row-2">
+      <div class="card">
+        <div class="panel-title">
+          Knowledge Base
+          <span class="badge" id="knowledge-total-badge">0 chunks</span>
+        </div>
+        <div id="knowledge-content">
+          <div class="empty-state">No knowledge data yet</div>
+        </div>
+
+        <div class="panel-title" style="margin-top: 20px;">
+          Model Usage
+          <span class="badge" id="models-total-badge">0 tasks</span>
+        </div>
+        <div id="models-content">
+          <div class="empty-state">No model data yet</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="panel-title">
+          DMN Insights
+          <span class="badge" id="insights-total-badge">0 insights</span>
+        </div>
+        <div id="insights-content">
+          <div class="empty-state">No insights yet. DMN runs during deep idle.</div>
+        </div>
+
+        <div class="panel-title" style="margin-top: 20px;">
+          Feedback
+        </div>
+        <div id="feedback-content">
+          <div class="empty-state">No feedback data yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Task History -->
+    <div class="row row-1">
+      <div class="card">
+        <div class="panel-title">
+          Task History
+          <span class="badge" id="task-history-badge">0 total</span>
+        </div>
+        <div class="table-container">
+          <table id="task-table">
+            <thead>
+              <tr>
+                <th data-sort="timestamp">Time</th>
+                <th data-sort="prompt">Prompt</th>
+                <th data-sort="modelUsed">Model</th>
+                <th data-sort="tier">Tier</th>
+                <th data-sort="costUsd">Cost</th>
+                <th data-sort="qualityScore">Quality</th>
+                <th data-sort="cacheHit">Cache</th>
+                <th data-sort="durationMs">Duration</th>
+              </tr>
+            </thead>
+            <tbody id="task-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination">
+          <button id="page-prev" disabled>Prev</button>
+          <span class="page-info" id="page-info">Page 1 of 1</span>
+          <button id="page-next" disabled>Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: Learning -->
+    <div class="row row-1">
+      <div class="card">
+        <div class="panel-title">
+          Active Learning
+          <span class="badge" id="learner-status-badge">Idle</span>
+        </div>
+        <div id="learning-content">
+          <div class="empty-state">No learning data yet</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────
+    let currentPage = 1;
+    const pageSize = 20;
+    let totalPages = 1;
+    let refreshTimer = null;
+    let isRefreshing = false;
+
+    // ── API Base ───────────────────────────────────────────────
+    // Detect whether we're served under /dashboard/ or root
+    const API_BASE = (function() {
+      if (window.location.pathname.startsWith('/dashboard')) {
+        return '/dashboard/api';
+      }
+      // Try the /dashboard/api endpoints; fall back to /api
+      return '/dashboard/api';
+    })();
+
+    // ── Helpers ────────────────────────────────────────────────
+    async function fetchJSON(path) {
+      try {
+        const res = await fetch(API_BASE + path);
+        if (!res.ok) throw new Error(res.statusText);
+        return await res.json();
+      } catch (e) {
+        // Fall back to legacy /api/* if dashboard prefix fails
+        try {
+          const res2 = await fetch('/api' + path);
+          if (!res2.ok) return null;
+          return await res2.json();
+        } catch {
+          return null;
+        }
+      }
+    }
+
+    function $(id) { return document.getElementById(id); }
+
+    function formatCost(usd) {
+      if (usd == null) return '$0.0000';
+      return '$' + Number(usd).toFixed(4);
+    }
+
+    function formatPct(ratio) {
+      if (ratio == null) return '0.0%';
+      return (Number(ratio) * 100).toFixed(1) + '%';
+    }
+
+    function formatPctDirect(pct) {
+      if (pct == null) return '0.0%';
+      return Number(pct).toFixed(1) + '%';
+    }
+
+    function formatScore(n) {
+      if (n == null) return '0.00';
+      return Number(n).toFixed(2);
+    }
+
+    function formatDuration(ms) {
+      if (ms == null || ms === 0) return '--';
+      if (ms < 1000) return ms + 'ms';
+      if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+      return (ms / 60000).toFixed(1) + 'm';
+    }
+
+    function formatTime(ts) {
+      if (!ts) return '--';
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return '--';
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function tierLabel(tier) {
+      const labels = { 0: 'Cache', 1: 'Local', 2: 'Cheap', 3: 'Mid', 4: 'Frontier' };
+      return labels[tier] ?? ('T' + tier);
+    }
+
+    function tierClass(tier) {
+      const classes = { 0: 'tag-cache', 1: 'tag-local', 2: 'tag-cheap', 3: 'tag-mid', 4: 'tag-frontier' };
+      return classes[tier] ?? 'tag-cache';
+    }
+
+    function tierBarClass(tier) {
+      return 'tier-' + (tier ?? 0);
+    }
+
+    function cacheTag(hit) {
+      if (hit === 'exact') return '<span class="tag tag-hit">EXACT</span>';
+      if (hit === 'adapt') return '<span class="tag tag-adapt">ADAPT</span>';
+      return '<span class="tag tag-miss">MISS</span>';
+    }
+
+    function qualityClass(score) {
+      if (score >= 0.7) return 'quality-good';
+      if (score >= 0.4) return 'quality-ok';
+      return 'quality-bad';
+    }
+
+    function scoreClass(score) {
+      if (score >= 0.7) return 'score-high';
+      if (score >= 0.4) return 'score-medium';
+      return 'score-low';
+    }
+
+    function qualityColor(score) {
+      if (score >= 0.7) return 'var(--success)';
+      if (score >= 0.4) return 'var(--warning)';
+      return 'var(--error)';
+    }
+
+    function escapeHtml(text) {
+      const el = document.createElement('span');
+      el.textContent = text;
+      return el.innerHTML;
+    }
+
+    // ── Bar Chart Renderer ────────────────────────────────────
+    function renderBarChart(containerId, items) {
+      // items: { label, value, displayValue, barClass }[]
+      const container = $(containerId);
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="empty-state">No data</div>';
+        return;
+      }
+
+      const maxValue = Math.max(...items.map(i => i.value), 0.0001);
+
+      container.innerHTML = items.map(item => {
+        const pct = (item.value / maxValue) * 100;
+        return `
+          <div class="bar-row">
+            <span class="bar-label" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</span>
+            <div class="bar-track">
+              <div class="bar-fill ${item.barClass}" style="width: ${Math.max(pct, 1)}%"></div>
+            </div>
+            <span class="bar-value">${item.displayValue}</span>
+          </div>`;
+      }).join('');
+    }
+
+    // ── Data Refresh ──────────────────────────────────────────
+    async function refreshAll() {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      $('refresh-dot').classList.add('loading');
+
+      const [costs, cache, quality, knowledge, learning, insights, tasks, feedback, models] = await Promise.all([
+        fetchJSON('/costs'),
+        fetchJSON('/cache'),
+        fetchJSON('/quality'),
+        fetchJSON('/knowledge'),
+        fetchJSON('/learning'),
+        fetchJSON('/insights?limit=8'),
+        fetchJSON('/tasks?page=' + currentPage + '&limit=' + pageSize),
+        fetchJSON('/feedback'),
+        fetchJSON('/models'),
+      ]);
+
+      // ── Costs ───────────────────────────────────────────────
+      if (costs) {
+        $('cost-today').textContent = formatCost(costs.today?.totalUsd);
+        $('cost-today-tasks').textContent = (costs.today?.taskCount ?? 0) + ' tasks';
+        $('cost-week').textContent = formatCost(costs.thisWeek?.totalUsd);
+        $('cost-month').textContent = formatCost(costs.thisMonth?.totalUsd);
+
+        // Tier chart
+        const byTier = costs.byTier || [];
+        if (byTier.length > 0) {
+          const totalCost = byTier.reduce((s, t) => s + (t.totalUsd || 0), 0);
+          $('tier-total-badge').textContent = formatCost(totalCost) + ' total';
+          renderBarChart('tier-chart', byTier.map(t => ({
+            label: tierLabel(t.tier) + ' (' + (t.taskCount || 0) + ')',
+            value: t.totalUsd || 0,
+            displayValue: formatCost(t.totalUsd),
+            barClass: tierBarClass(t.tier),
+          })));
+        }
+
+        // Also add by-model bars if present
+        const byModel = costs.byModel || [];
+        if (byModel.length > 0 && byTier.length === 0) {
+          const totalCost = byModel.reduce((s, m) => s + (m.totalUsd || 0), 0);
+          $('tier-total-badge').textContent = formatCost(totalCost) + ' total';
+          renderBarChart('tier-chart', byModel.map(m => ({
+            label: m.model,
+            value: m.totalUsd || 0,
+            displayValue: formatCost(m.totalUsd),
+            barClass: 'tier-2',
+          })));
+        }
+      }
+
+      // ── Cache ───────────────────────────────────────────────
+      if (cache) {
+        // Support both flat cache object and legacy format
+        const hitRate = cache.hitRate ?? 0;
+        const exact = cache.exactHits ?? 0;
+        const adapt = cache.adaptHits ?? 0;
+        const miss = cache.misses ?? 0;
+        const entries = cache.totalEntries ?? 0;
+        const savings = cache.savingsEstimate ?? 0;
+
+        $('cache-rate').textContent = formatPctDirect(hitRate);
+        $('cache-rate').className = 'metric-value ' + (hitRate >= 30 ? 'success' : hitRate >= 10 ? 'warning' : 'accent');
+        $('cache-entries').textContent = entries + ' entries cached';
+        $('cache-exact').textContent = exact;
+        $('cache-adapt').textContent = adapt;
+        $('cache-miss').textContent = miss;
+        $('cache-savings-badge').textContent = formatCost(savings) + ' saved';
+
+        const cacheItems = [
+          { label: 'Exact Hits', value: exact, displayValue: String(exact), barClass: 'cache-exact' },
+          { label: 'Adaptations', value: adapt, displayValue: String(adapt), barClass: 'cache-adapt' },
+          { label: 'Misses', value: miss, displayValue: String(miss), barClass: 'cache-miss' },
+        ];
+        if (exact + adapt + miss > 0) {
+          renderBarChart('cache-chart', cacheItems);
+        }
+      }
+
+      // ── Quality ─────────────────────────────────────────────
+      if (quality) {
+        const score = quality.avgCompositeScore ?? 0;
+        $('quality-score').textContent = formatScore(score);
+        $('quality-score').className = 'metric-value ' + (score >= 0.7 ? 'success' : score >= 0.4 ? 'warning' : 'error');
+        $('quality-confidence').textContent = 'confidence: ' + formatScore(quality.avgTotalConfidence);
+        $('quality-evidence').textContent = formatScore(quality.avgEvidenceConfidence);
+        $('quality-coherence').textContent = formatScore(quality.avgCoherenceConfidence);
+        $('quality-failures').textContent = formatPct(quality.failureRate);
+        $('quality-failures').style.color = (quality.failureRate ?? 0) > 0.1 ? 'var(--error)' : 'var(--text)';
+        $('quality-escalations').textContent = formatPct(quality.escalationRate);
+        $('tasks-total').textContent = quality.totalTasks ?? 0;
+      }
+
+      // ── Knowledge ───────────────────────────────────────────
+      if (knowledge) {
+        const totalChunks = knowledge.totalChunks ?? 0;
+        $('knowledge-total-badge').textContent = totalChunks + ' chunks';
+
+        const byDomain = knowledge.byDomain || [];
+        if (byDomain.length > 0) {
+          $('knowledge-content').innerHTML = byDomain.map(d => `
+            <div class="knowledge-item">
+              <span class="knowledge-domain">${escapeHtml(d.domain || 'unknown')}</span>
+              <span>${d.chunks ?? 0} chunks, ${d.sources ?? 0} sources</span>
+            </div>
+          `).join('');
+        } else {
+          $('knowledge-content').innerHTML = `
+            <div class="knowledge-item">
+              <span class="knowledge-domain">Total</span>
+              <span>${totalChunks} chunks</span>
+            </div>
+          `;
+        }
+      }
+
+      // ── Models ──────────────────────────────────────────────
+      if (models && models.models && models.models.length > 0) {
+        $('models-total-badge').textContent = models.totalTasks + ' tasks';
+        $('models-content').innerHTML = models.models.map(m => {
+          const pct = m.percentage ?? 0;
+          const tier = m.tier ?? 0;
+          const colors = {
+            0: 'var(--success)', 1: 'var(--success)',
+            2: 'var(--accent)', 3: 'var(--warning)', 4: 'var(--error)'
+          };
+          const bg = colors[tier] || 'var(--accent)';
+          return `
+            <div class="model-row">
+              <span class="model-name" title="${escapeHtml(m.model)}">${escapeHtml(m.model)}</span>
+              <div class="model-bar-track">
+                <div class="model-bar-fill" style="width: ${Math.max(pct, 2)}%; background: ${bg};">
+                  ${pct >= 10 ? pct.toFixed(0) + '%' : ''}
+                </div>
+              </div>
+              <span class="model-stats">${formatCost(m.totalCost)} / ${m.taskCount} tasks</span>
+            </div>`;
+        }).join('');
+      } else if (models) {
+        $('models-content').innerHTML = '<div class="empty-state">No model usage data</div>';
+      }
+
+      // ── Insights ────────────────────────────────────────────
+      if (insights) {
+        const insightList = insights.insights || insights;
+        const stats = insights.stats || {};
+        $('insights-total-badge').textContent = (stats.totalInsights ?? (Array.isArray(insightList) ? insightList.length : 0)) + ' insights';
+
+        if (Array.isArray(insightList) && insightList.length > 0) {
+          $('insights-content').innerHTML = insightList.map(i => `
+            <div class="insight-card">
+              <div class="insight-header">
+                <span class="insight-domains">${escapeHtml(i.sourceADomain || '?')} &harr; ${escapeHtml(i.sourceBDomain || '?')}</span>
+                <span class="insight-score ${scoreClass(i.overallScore)}">${formatScore(i.overallScore)}</span>
+              </div>
+              <div class="insight-connection">${escapeHtml(i.connection || '')}</div>
+              ${i.analogy ? '<div class="insight-analogy">' + escapeHtml(i.analogy) + '</div>' : ''}
+            </div>
+          `).join('');
+        } else {
+          $('insights-content').innerHTML = '<div class="empty-state">No insights yet. DMN runs during deep idle.</div>';
+        }
+      }
+
+      // ── Feedback ────────────────────────────────────────────
+      if (feedback) {
+        const total = feedback.total ?? 0;
+        if (total > 0) {
+          let html = '<div class="feedback-stats">';
+          html += `<div class="feedback-stat">
+            <div class="fb-value" style="color:var(--success)">${formatPct(feedback.acceptanceRate)}</div>
+            <div class="fb-label">Accepted (${feedback.accepts ?? 0})</div>
+          </div>`;
+          html += `<div class="feedback-stat">
+            <div class="fb-value" style="color:var(--error)">${formatPct(feedback.rejectionRate)}</div>
+            <div class="fb-label">Rejected (${feedback.rejects ?? 0})</div>
+          </div>`;
+          html += `<div class="feedback-stat">
+            <div class="fb-value" style="color:var(--warning)">${formatPct(feedback.flagRate)}</div>
+            <div class="fb-label">Flagged (${feedback.flags ?? 0})</div>
+          </div>`;
+          html += '</div>';
+
+          const reasons = feedback.topRejectionReasons || [];
+          if (reasons.length > 0) {
+            html += '<div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:6px;">Top rejection reasons:</div>';
+            reasons.forEach(r => {
+              html += `<div class="knowledge-item">
+                <span>${escapeHtml(r.reason || 'unspecified')}</span>
+                <span style="color:var(--error)">${r.count}x</span>
+              </div>`;
+            });
+          }
+
+          $('feedback-content').innerHTML = html;
+        } else {
+          $('feedback-content').innerHTML = '<div class="empty-state">No feedback data yet</div>';
+        }
+      }
+
+      // ── Tasks ───────────────────────────────────────────────
+      if (tasks) {
+        const taskList = tasks.tasks || tasks;
+        const pagination = tasks.pagination || {};
+        totalPages = pagination.totalPages || 1;
+        const total = pagination.total || (Array.isArray(taskList) ? taskList.length : 0);
+
+        $('task-history-badge').textContent = total + ' total';
+
+        const tbody = $('task-tbody');
+        if (Array.isArray(taskList) && taskList.length > 0) {
+          tbody.innerHTML = taskList.map(t => {
+            const qClass = qualityClass(t.qualityScore ?? 0);
+            return `<tr>
+              <td>${formatTime(t.timestamp)}</td>
+              <td class="prompt-cell" title="${escapeHtml(t.prompt || '')}">${escapeHtml((t.prompt || '').slice(0, 80))}</td>
+              <td>${escapeHtml(t.modelUsed || '--')}</td>
+              <td><span class="tag ${tierClass(t.tier)}">${tierLabel(t.tier)}</span></td>
+              <td class="cost">${formatCost(t.costUsd)}</td>
+              <td class="${qClass}">${formatScore(t.qualityScore)}</td>
+              <td>${cacheTag(t.cacheHit)}</td>
+              <td class="duration">${formatDuration(t.durationMs)}</td>
+            </tr>`;
+          }).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No tasks recorded yet</td></tr>';
+        }
+
+        // Pagination controls
+        $('page-info').textContent = 'Page ' + currentPage + ' of ' + Math.max(totalPages, 1);
+        $('page-prev').disabled = currentPage <= 1;
+        $('page-next').disabled = currentPage >= totalPages;
+      }
+
+      // ── Learning ────────────────────────────────────────────
+      if (learning) {
+        $('learner-status-badge').textContent = learning.isRunning ? 'Running' : 'Idle';
+        $('learner-status-badge').style.color = learning.isRunning ? 'var(--success)' : '';
+
+        let html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;">';
+        html += `<div class="feedback-stat">
+          <div class="fb-value" style="color:var(--warning)">${learning.gapsIdentified ?? learning.gapsDetected ?? 0}</div>
+          <div class="fb-label">Gaps Found</div>
+        </div>`;
+        html += `<div class="feedback-stat">
+          <div class="fb-value" style="color:var(--success)">${learning.highQualityTasks ?? 0}</div>
+          <div class="fb-label">High Quality</div>
+        </div>`;
+        html += `<div class="feedback-stat">
+          <div class="fb-value" style="color:var(--accent)">${learning.plansGenerated ?? 0}</div>
+          <div class="fb-label">Plans Generated</div>
+        </div>`;
+        html += `<div class="feedback-stat">
+          <div class="fb-value" style="color:var(--text)">${formatScore(learning.avgImprovementScore)}</div>
+          <div class="fb-label">Avg Score</div>
+        </div>`;
+        html += '</div>';
+
+        if (learning.lastRun) {
+          html += `<div style="font-size:0.75rem;color:var(--text-dim);">Last run: ${new Date(learning.lastRun).toLocaleString()} | Idle: ${learning.idleMinutes ?? 0} min</div>`;
+        }
+
+        $('learning-content').innerHTML = html;
+      }
+
+      // ── Update timestamp ────────────────────────────────────
+      $('last-updated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+
+      // ── Hide loading overlay ────────────────────────────────
+      $('loading-overlay').classList.add('hidden');
+
+      isRefreshing = false;
+      $('refresh-dot').classList.remove('loading');
+    }
+
+    // ── Pagination handlers ───────────────────────────────────
+    $('page-prev').addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage--;
+        refreshAll();
+      }
+    });
+
+    $('page-next').addEventListener('click', () => {
+      if (currentPage < totalPages) {
+        currentPage++;
+        refreshAll();
+      }
+    });
+
+    // ── Init ──────────────────────────────────────────────────
+    refreshAll();
+    refreshTimer = setInterval(refreshAll, 30000);
+
+    // Expose for console debugging
+    window.refreshDashboard = refreshAll;
+  </script>
+</body>
+</html>

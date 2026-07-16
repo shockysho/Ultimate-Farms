@@ -102,3 +102,5 @@ and rodent/manure management.
 
 - [Design Blueprint](docs/DESIGN_BLUEPRINT.md) - Complete design specification
 - [Technical Architecture](docs/ARCHITECTURE.md) - System architecture and tech decisions
+- [Mobile App Design Document](docs/ULTIMATE_FARMS_MOBILE_APP_DESIGN.md) - Comprehensive product and systems design for implementation
+- [Mobile UI Wireframe](docs/wireframes/ultimate-farms-mobile-wireframe.html) - Low-fidelity visual wireframe for core role workflows
